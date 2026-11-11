@@ -10,10 +10,13 @@ interface RequestListProps {
   showUser?: boolean;
   showActions?: boolean;
   showAdminDetails?: boolean;
+  showFailedActions?: boolean;
   onApprove?: (id: number) => void;
   onDecline?: (id: number) => void;
   onSearch?: (albumId: number) => void;
   onUnmonitor?: (albumMbid: string) => void;
+  onRetry?: (id: number) => Promise<void>;
+  onRemove?: (id: number) => Promise<void>;
 }
 
 export default function RequestList({
@@ -24,10 +27,13 @@ export default function RequestList({
   showUser = false,
   showActions = false,
   showAdminDetails = false,
+  showFailedActions = false,
   onApprove,
   onDecline,
   onSearch,
   onUnmonitor,
+  onRetry,
+  onRemove,
 }: RequestListProps) {
   if (loading) {
     return (
@@ -70,10 +76,13 @@ export default function RequestList({
           showUser={showUser}
           showActions={showActions}
           showAdminDetails={showAdminDetails}
+          showFailedActions={showFailedActions}
           onApprove={onApprove}
           onDecline={onDecline}
           onSearch={onSearch}
           onUnmonitor={onUnmonitor}
+          onRetry={onRetry}
+          onRemove={onRemove}
         />
       ))}
     </div>

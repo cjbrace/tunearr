@@ -10,11 +10,27 @@ import {
 import { invalidateLidarrCaches } from "../lidarr/invalidate";
 
 type FulfillResult =
-  | { status: "success"; artistName: string; albumTitle: string }
-  | { status: "already_monitored"; artistName: string; albumTitle: string };
+  | {
+      status: "success";
+      artistName: string;
+      albumTitle: string;
+      searchQueued: boolean;
+    }
+  | {
+      status: "already_monitored";
+      artistName: string;
+      albumTitle: string;
+      searchQueued: false;
+    };
+
+type FulfillOptions = {
+  /** A manual retry may search an existing monitored album with missing files. */
+  searchIfMonitored?: boolean;
+};
 
 export async function fulfillRequest(
-  albumMbid: string
+  albumMbid: string,
+  options: FulfillOptions = {}
 ): Promise<FulfillResult> {
   const lookupAlbum = await getAlbumByMbid(albumMbid);
   const artistMbid = lookupAlbum.artist?.foreignArtistId;
@@ -29,9 +45,18 @@ export async function fulfillRequest(
   const artist = await getOrAddArtist(artistMbid);
   const { wasAdded, album } = await getOrAddAlbum(albumMbid, artist);
 
-  if (!wasAdded && album?.monitored) {
-    return { status: "already_monitored", artistName, albumTitle };
-  }
+  const stats = album.statistics;
+  const expected = stats?.trackCount ?? stats?.totalTrackCount ?? 0;
+  const complete =
+    !wasAdded && expected > 0 && (stats?.trackFileCount ?? 0) >= expected;
+
+  if (!wasAdded && album.monitored && (!options.searchIfMonitored || complete))
+    return {
+      status: "already_monitored",
+      artistName,
+      albumTitle,
+      searchQueued: false,
+    };
 
   if (!album.monitored) {
     const monitorResult = await lidarrPut("/album/monitor", {
@@ -44,24 +69,17 @@ export async function fulfillRequest(
     }
   }
 
-  const stats = album.statistics;
-  const cachedComplete =
-    !wasAdded &&
-    (stats?.trackFileCount ?? 0) > 0 &&
-    (stats?.trackCount ?? stats?.totalTrackCount ?? 0) > 0 &&
-    (stats?.trackFileCount ?? 0) >=
-      (stats?.trackCount ?? stats?.totalTrackCount ?? 0);
-
-  if (!cachedComplete) {
-    await lidarrPost("/command", {
+  if (!complete) {
+    const search = await lidarrPost("/command", {
       name: "AlbumSearch",
       albumIds: [album.id],
     });
+    if (!search.ok) throw new Error("Lidarr did not accept the album search");
   }
 
   invalidateLidarrCaches();
   clearPromotedAlbumCache();
   clearPromotedArtistsCache();
 
-  return { status: "success", artistName, albumTitle };
+  return { status: "success", artistName, albumTitle, searchQueued: !complete };
 }

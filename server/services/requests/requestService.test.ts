@@ -12,6 +12,9 @@ const mockFindOne = vi.fn();
 const mockCreate = vi.fn();
 const mockSave = vi.fn();
 const mockGetMany = vi.fn();
+const mockRemove = vi.fn();
+const mockRefreshLidarrData = vi.fn();
+const mockClassifyRequest = vi.fn();
 
 /** Records calls made on the query builder so tests can assert filter SQL. */
 const qbCalls = {
@@ -48,6 +51,7 @@ vi.mock("../../db/index", () => ({
       findOne: (...args: unknown[]) => mockFindOne(...args),
       create: (...args: unknown[]) => mockCreate(...args),
       save: (...args: unknown[]) => mockSave(...args),
+      remove: (...args: unknown[]) => mockRemove(...args),
       createQueryBuilder: () => queryBuilder,
     }),
   }),
@@ -56,6 +60,11 @@ vi.mock("../../db/index", () => ({
 
 vi.mock("./fulfillRequest", () => ({
   fulfillRequest: (...args: unknown[]) => mockFulfillRequest(...args),
+}));
+
+vi.mock("./lidarrEnrichment", () => ({
+  refreshLidarrData: (...args: unknown[]) => mockRefreshLidarrData(...args),
+  classifyRequest: (...args: unknown[]) => mockClassifyRequest(...args),
 }));
 
 vi.mock("../lidarr/helpers", () => ({
@@ -81,6 +90,8 @@ import {
   approveRequest,
   declineRequest,
   getRequests,
+  retryFailedRequest,
+  removeFailedRequest,
 } from "./requestService";
 
 beforeEach(() => {
@@ -94,6 +105,77 @@ beforeEach(() => {
   mockNotifyApproved.mockResolvedValue(undefined);
   mockNotifyDeclined.mockResolvedValue(undefined);
   mockNotifyCreated.mockResolvedValue(undefined);
+  mockRefreshLidarrData.mockResolvedValue({
+    queueMap: new Map(),
+    importedMap: new Map(),
+    wantedMap: new Map(),
+  });
+  mockClassifyRequest.mockReturnValue({ status: null });
+});
+
+describe("failed request recovery", () => {
+  const failed = {
+    id: 9,
+    album_mbid: "mbid-9",
+    status: "approved",
+    lidarr_status: "failed",
+  };
+
+  it("retries the same row and records a queued search", async () => {
+    mockFindOne.mockResolvedValue({ ...failed });
+    mockFulfillRequest.mockResolvedValue({
+      status: "success",
+      searchQueued: true,
+    });
+    mockSave.mockImplementation(async (value) => value);
+
+    const result = await retryFailedRequest(9);
+    expect(result).toEqual({ status: "wanted" });
+    expect(mockFulfillRequest).toHaveBeenCalledWith("mbid-9", {
+      searchIfMonitored: true,
+    });
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 9, lidarr_status: "wanted" })
+    );
+  });
+
+  it("leaves an active download alone", async () => {
+    mockFindOne.mockResolvedValue({ ...failed });
+    mockClassifyRequest.mockReturnValue({ status: "downloading" });
+    mockSave.mockImplementation(async (value) => value);
+
+    expect(await retryFailedRequest(9)).toEqual({ status: "downloading" });
+    expect(mockFulfillRequest).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed row retryable when Lidarr rejects the retry", async () => {
+    mockFindOne.mockResolvedValue({ ...failed });
+    mockFulfillRequest.mockRejectedValue(new Error("Album not found"));
+    mockSave.mockImplementation(async (value) => value);
+
+    expect(await retryFailedRequest(9)).toEqual({
+      status: "failed",
+      error: "Album not found",
+    });
+    expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({ lidarr_status: "failed" })
+    );
+  });
+
+  it("removes only failed history without touching Lidarr", async () => {
+    mockFindOne.mockResolvedValue({ ...failed });
+    mockRemove.mockResolvedValue({ ...failed });
+
+    expect(await removeFailedRequest(9)).toEqual({ status: "removed" });
+    expect(mockRemove).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }));
+    expect(mockFulfillRequest).not.toHaveBeenCalled();
+  });
+
+  it("refuses to remove a nonfailed request", async () => {
+    mockFindOne.mockResolvedValue({ ...failed, lidarr_status: "wanted" });
+    expect(await removeFailedRequest(9)).toEqual({ status: "not_failed" });
+    expect(mockRemove).not.toHaveBeenCalled();
+  });
 });
 
 describe("createRequest", () => {

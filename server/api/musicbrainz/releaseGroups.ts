@@ -5,6 +5,7 @@ import type { MbPriority } from "./queue";
 import type {
   MusicBrainzReleaseGroup,
   MusicBrainzSearchResponse,
+  MusicBrainzBrowseReleaseGroupsResponse,
   ReleaseGroupSearchResult,
   MusicBrainzRelease,
   ReleaseGroupInfo,
@@ -24,30 +25,53 @@ export type AlbumDetails = {
 type LabelResult = { name: string; mbid: string } | null;
 
 const log = createLogger("musicbrainz");
+const PAGE_SIZE = 100;
+const MAX_SEARCH_RESULTS = 500;
+const MAX_ARTIST_RELEASE_GROUPS = 500;
 
 async function loadReleaseGroupSearch(
   query: string,
   priority: MbPriority
 ): Promise<ReleaseGroupSearchResult> {
-  const url = `${MB_BASE}/release-group/?query=${encodeURIComponent(query)}&limit=100&fmt=json`;
-  const data = await mbJson<MusicBrainzSearchResponse>(url, priority);
-
-  if (!data) {
-    return { "release-groups": [], count: 0, offset: 0 };
+  const releaseGroups: MusicBrainzReleaseGroup[] = [];
+  let count = 0;
+  for (let offset = 0; offset < MAX_SEARCH_RESULTS; offset += PAGE_SIZE) {
+    const url = `${MB_BASE}/release-group/?query=${encodeURIComponent(query)}&limit=${PAGE_SIZE}&offset=${offset}&fmt=json`;
+    const data = await mbJson<MusicBrainzSearchResponse>(url, priority);
+    if (!data) break;
+    releaseGroups.push(...data["release-groups"]);
+    count = data.count;
+    if (!data["release-groups"].length || releaseGroups.length >= count) break;
   }
 
-  const sorted = [...data["release-groups"]].sort((a, b) => b.score - a.score);
-
-  return { ...data, "release-groups": sorted, count: sorted.length };
+  releaseGroups.sort((a, b) => b.score - a.score);
+  return { "release-groups": releaseGroups, count, offset: 0 };
 }
 
 async function loadArtistReleaseGroups(
   artistId: string,
   priority: MbPriority
 ): Promise<MusicBrainzReleaseGroup[]> {
-  const url = `${MB_BASE}/release-group?artist=${artistId}&type=album|ep|single&limit=100&inc=artist-credits&fmt=json`;
-  const data = await mbJson<MusicBrainzSearchResponse>(url, priority);
-  return data?.["release-groups"] ?? [];
+  const releaseGroups: MusicBrainzReleaseGroup[] = [];
+  for (
+    let offset = 0;
+    offset < MAX_ARTIST_RELEASE_GROUPS;
+    offset += PAGE_SIZE
+  ) {
+    const url = `${MB_BASE}/release-group?artist=${artistId}&type=album|ep|single&limit=${PAGE_SIZE}&offset=${offset}&inc=artist-credits&fmt=json`;
+    const data = await mbJson<MusicBrainzBrowseReleaseGroupsResponse>(
+      url,
+      priority
+    );
+    if (!data) break;
+    releaseGroups.push(...data["release-groups"]);
+    if (
+      !data["release-groups"].length ||
+      releaseGroups.length >= data["release-group-count"]
+    )
+      break;
+  }
+  return releaseGroups;
 }
 
 async function loadReleaseGroupSummary(
@@ -151,7 +175,7 @@ export function searchReleaseGroups(
 ): Promise<ReleaseGroupSearchResult> {
   return mbCached(
     {
-      key: `rg-search:${query.toLowerCase()}`,
+      key: `rg-search:v2:${query.toLowerCase()}`,
       ttlSeconds: MB_TTL.volatile,
       priority,
       strategy: "revalidate",
@@ -167,7 +191,7 @@ export function fetchReleaseGroupsForArtist(
 ): Promise<MusicBrainzReleaseGroup[]> {
   return mbCached(
     {
-      key: `artist-rgs:${artistId}`,
+      key: `artist-rgs:v2:${artistId}`,
       ttlSeconds: MB_TTL.volatile,
       priority,
       strategy: "revalidate",

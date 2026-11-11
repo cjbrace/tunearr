@@ -7,6 +7,8 @@ import {
   approveRequest,
   declineRequest,
   getRequests,
+  retryFailedRequest,
+  removeFailedRequest,
 } from "../services/requests/requestService";
 import { enrichRequestsWithLidarr } from "../services/requests/lidarrEnrichment";
 import { runStatusSyncOnce } from "../services/requests/statusPoller";
@@ -71,6 +73,7 @@ router.get("/", async (req: Request, res: Response) => {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     approvedAt: r.approved_at,
+    retryable: r.status === "approved" && r.lidarr_status === "failed",
     user: r.user
       ? {
           id: r.user.id,
@@ -100,6 +103,46 @@ router.get("/", async (req: Request, res: Response) => {
 
   res.json(sanitized);
 });
+
+function parseRequestId(raw: string | string[]): number | null {
+  if (Array.isArray(raw)) return null;
+  const id = Number(raw);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+router.post(
+  "/:id/retry",
+  requirePermission(Permission.MANAGE_REQUESTS),
+  async (req: Request, res: Response) => {
+    const id = parseRequestId(req.params.id);
+    if (id === null)
+      return res.status(400).json({ error: "Invalid request ID" });
+    const result = await retryFailedRequest(id);
+    if (result.status === "not_found")
+      return res.status(404).json({ error: "Request not found" });
+    if (result.status === "not_failed")
+      return res.status(409).json({ error: "Request is not failed" });
+    if (result.status === "failed")
+      return res.status(502).json({ error: result.error });
+    res.json(result);
+  }
+);
+
+router.delete(
+  "/:id",
+  requirePermission(Permission.MANAGE_REQUESTS),
+  async (req: Request, res: Response) => {
+    const id = parseRequestId(req.params.id);
+    if (id === null)
+      return res.status(400).json({ error: "Invalid request ID" });
+    const result = await removeFailedRequest(id);
+    if (result.status === "not_found")
+      return res.status(404).json({ error: "Request not found" });
+    if (result.status === "not_failed")
+      return res.status(409).json({ error: "Request is not failed" });
+    res.json(result);
+  }
+);
 
 router.post(
   "/:id/approve",

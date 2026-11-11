@@ -84,6 +84,7 @@ export interface RequestItem {
   artistName: string | null;
   albumTitle: string | null;
   status: RequestStatus;
+  retryable?: boolean;
   createdAt: string;
   updatedAt: string;
   approvedAt: string | null;

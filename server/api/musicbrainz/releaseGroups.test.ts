@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   searchReleaseGroups,
+  fetchReleaseGroupsForArtist,
   getReleaseGroupById,
   getReleaseGroupIdFromRelease,
   resolveReleaseGroupInfo,
@@ -65,6 +66,72 @@ describe("searchReleaseGroups", () => {
 
     await expect(searchReleaseGroups("test")).rejects.toThrow(
       "MusicBrainz returned 503"
+    );
+  });
+
+  it("includes a soundtrack beyond the first 100 search results", async () => {
+    const first = Array.from({ length: 100 }, (_, i) => ({
+      id: `other-${i}`,
+      score: 100,
+      title: "Inception",
+    }));
+    const soundtrack = {
+      id: "cba0c394-1aa2-40e0-8613-a9ead5624c21",
+      score: 85,
+      title: "Inception: Music From the Motion Picture",
+      "primary-type": "Album",
+      "secondary-types": ["Soundtrack"],
+    };
+    mockFetch
+      .mockResolvedValueOnce(
+        okResponse({ "release-groups": first, count: 101, offset: 0 })
+      )
+      .mockResolvedValueOnce(
+        okResponse({ "release-groups": [soundtrack], count: 101, offset: 100 })
+      );
+
+    const result = await searchReleaseGroups("inception");
+    expect(result["release-groups"]).toContainEqual(soundtrack);
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${MB_BASE}/release-group/?query=inception&limit=100&offset=100&fmt=json`,
+      { headers: MB_HEADERS },
+      { retry: false }
+    );
+  });
+});
+
+describe("fetchReleaseGroupsForArtist", () => {
+  it("includes a soundtrack beyond the first 100 artist releases", async () => {
+    const first = Array.from({ length: 100 }, (_, i) => ({
+      id: `other-${i}`,
+      title: `Release ${i}`,
+    }));
+    const soundtrack = {
+      id: "cba0c394-1aa2-40e0-8613-a9ead5624c21",
+      title: "Inception: Music From the Motion Picture",
+    };
+    mockFetch
+      .mockResolvedValueOnce(
+        okResponse({
+          "release-groups": first,
+          "release-group-count": 101,
+          "release-group-offset": 0,
+        })
+      )
+      .mockResolvedValueOnce(
+        okResponse({
+          "release-groups": [soundtrack],
+          "release-group-count": 101,
+          "release-group-offset": 100,
+        })
+      );
+
+    const result = await fetchReleaseGroupsForArtist("hans-zimmer");
+    expect(result).toContainEqual(soundtrack);
+    expect(mockFetch).toHaveBeenCalledWith(
+      `${MB_BASE}/release-group?artist=hans-zimmer&type=album|ep|single&limit=100&offset=100&inc=artist-credits&fmt=json`,
+      { headers: MB_HEADERS },
+      { retry: false }
     );
   });
 });

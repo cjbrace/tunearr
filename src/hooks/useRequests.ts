@@ -15,6 +15,8 @@ type UseRequestsReturn = {
   refresh: () => Promise<void>;
   approveRequest: (id: number) => Promise<void>;
   declineRequest: (id: number) => Promise<void>;
+  retryFailedRequest: (id: number) => Promise<void>;
+  removeFailedRequest: (id: number) => Promise<void>;
 };
 
 function buildUrl(options: UseRequestsOptions): string {
@@ -74,6 +76,26 @@ export function useRequests({
     [setData]
   );
 
+  const retryFailedRequest = useCallback(
+    async (id: number) => {
+      const res = await fetch(`/api/requests/${id}/retry`, { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Failed to retry request");
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const removeFailedRequest = useCallback(
+    async (id: number) => {
+      const res = await fetch(`/api/requests/${id}`, { method: "DELETE" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Failed to remove request");
+      setData((prev) => prev.filter((request) => request.id !== id));
+    },
+    [setData]
+  );
+
   return {
     requests: data ?? [],
     loading: loading && data === null,
@@ -81,5 +103,7 @@ export function useRequests({
     refresh,
     approveRequest,
     declineRequest,
+    retryFailedRequest,
+    removeFailedRequest,
   };
 }

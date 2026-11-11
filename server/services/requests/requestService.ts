@@ -5,11 +5,14 @@ import {
   insertRequest,
   listRequests,
   saveRequest,
+  deleteRequest,
 } from "../../db/requests";
 import { hasPermission, Permission } from "../../../shared/permissions";
 import { getAlbumByMbid } from "../lidarr/helpers";
 import { fulfillRequest } from "./fulfillRequest";
 import { createLogger } from "../../logger";
+import { AsyncLock } from "../../api/asyncLock";
+import { classifyRequest, refreshLidarrData } from "./lidarrEnrichment";
 import {
   notifyRequestApproved,
   notifyRequestCreated,
@@ -38,6 +41,73 @@ type DeclineRequestResult =
   | { status: "already_resolved" };
 
 const log = createLogger("requests");
+const failedRequestLock = new AsyncLock();
+
+type FailedRequestActionResult =
+  | { status: "not_found" | "not_failed" }
+  | { status: "wanted" | "imported" | "downloading" }
+  | { status: "failed"; error: string };
+
+/**
+ * Retry the existing historical request, including albums already monitored
+ * with missing files. An active download is left alone.
+ */
+export async function retryFailedRequest(
+  requestId: number
+): Promise<FailedRequestActionResult> {
+  return failedRequestLock.acquire(String(requestId), async () => {
+    const request = await findRequestById(requestId);
+    if (!request) return { status: "not_found" };
+    if (request.status !== "approved" || request.lidarr_status !== "failed")
+      return { status: "not_failed" };
+
+    try {
+      const { queueMap, importedMap, wantedMap } = await refreshLidarrData();
+      const live = classifyRequest(
+        request.album_mbid,
+        queueMap,
+        importedMap,
+        wantedMap
+      );
+      if (live.status === "downloading") {
+        request.lidarr_status = "downloading";
+        await saveRequest(request);
+        return { status: "downloading" };
+      }
+
+      const result = await fulfillRequest(request.album_mbid, {
+        searchIfMonitored: true,
+      });
+      request.lidarr_status = result.searchQueued ? "wanted" : "imported";
+      await saveRequest(request);
+      log.info(
+        `Retried failed request #${requestId}: ${request.lidarr_status}`
+      );
+      return { status: result.searchQueued ? "wanted" : "imported" };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : "Retry failed";
+      request.lidarr_status = "failed";
+      await saveRequest(request);
+      log.error(`Failed to retry request #${requestId}: ${error}`);
+      return { status: "failed", error };
+    }
+  });
+}
+
+/** Delete only a failed request row; do not change Lidarr or media. */
+export async function removeFailedRequest(
+  requestId: number
+): Promise<{ status: "removed" | "not_found" | "not_failed" }> {
+  return failedRequestLock.acquire(String(requestId), async () => {
+    const request = await findRequestById(requestId);
+    if (!request) return { status: "not_found" };
+    if (request.status !== "approved" || request.lidarr_status !== "failed")
+      return { status: "not_failed" };
+    await deleteRequest(request);
+    log.info(`Removed failed request history #${requestId}`);
+    return { status: "removed" };
+  });
+}
 
 function shouldAutoApprove(userPermissions: number): boolean {
   return hasPermission(userPermissions, [

@@ -58,6 +58,50 @@ describe("fulfillRequest", () => {
     expect(mockLidarrPut).not.toHaveBeenCalled();
   });
 
+  it("retries a monitored album with missing files by starting a search", async () => {
+    mockGetAlbumByMbid.mockResolvedValue({
+      title: "Test Album",
+      artist: { foreignArtistId: "art-1", artistName: "Test Artist" },
+    });
+    mockGetOrAddArtist.mockResolvedValue({ id: 1 });
+    mockGetOrAddAlbum.mockResolvedValue({
+      wasAdded: false,
+      album: {
+        id: 10,
+        monitored: true,
+        statistics: { trackFileCount: 0, totalTrackCount: 12 },
+      },
+    });
+    mockLidarrPost.mockResolvedValue({ ok: true });
+
+    const result = await fulfillRequest("mbid-1", { searchIfMonitored: true });
+    expect(result.searchQueued).toBe(true);
+    expect(mockLidarrPost).toHaveBeenCalledWith("/command", {
+      name: "AlbumSearch",
+      albumIds: [10],
+    });
+  });
+
+  it("does not search when a retried album is already complete", async () => {
+    mockGetAlbumByMbid.mockResolvedValue({
+      title: "Test Album",
+      artist: { foreignArtistId: "art-1", artistName: "Test Artist" },
+    });
+    mockGetOrAddArtist.mockResolvedValue({ id: 1 });
+    mockGetOrAddAlbum.mockResolvedValue({
+      wasAdded: false,
+      album: {
+        id: 10,
+        monitored: true,
+        statistics: { trackFileCount: 12, totalTrackCount: 12 },
+      },
+    });
+
+    const result = await fulfillRequest("mbid-1", { searchIfMonitored: true });
+    expect(result.searchQueued).toBe(false);
+    expect(mockLidarrPost).not.toHaveBeenCalled();
+  });
+
   it("monitors and searches when album exists but is unmonitored", async () => {
     mockGetAlbumByMbid.mockResolvedValue({
       title: "Test Album",

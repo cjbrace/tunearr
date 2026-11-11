@@ -4,6 +4,8 @@ const mockCreateRequest = vi.fn();
 const mockApproveRequest = vi.fn();
 const mockDeclineRequest = vi.fn();
 const mockGetRequests = vi.fn();
+const mockRetryFailedRequest = vi.fn();
+const mockRemoveFailedRequest = vi.fn();
 const mockEnrichRequestsWithLidarr = vi.fn();
 const mockRunStatusSyncOnce = vi.fn();
 
@@ -16,6 +18,8 @@ vi.mock("../services/requests/requestService", () => ({
   approveRequest: (...args: unknown[]) => mockApproveRequest(...args),
   declineRequest: (...args: unknown[]) => mockDeclineRequest(...args),
   getRequests: (...args: unknown[]) => mockGetRequests(...args),
+  retryFailedRequest: (...args: unknown[]) => mockRetryFailedRequest(...args),
+  removeFailedRequest: (...args: unknown[]) => mockRemoveFailedRequest(...args),
 }));
 
 vi.mock("../services/requests/lidarrEnrichment", () => ({
@@ -68,6 +72,40 @@ app.use(
 beforeEach(() => {
   vi.clearAllMocks();
   mockRunStatusSyncOnce.mockResolvedValue(undefined);
+});
+
+describe("failed request actions", () => {
+  it("retries a failed request in place", async () => {
+    mockRetryFailedRequest.mockResolvedValue({ status: "wanted" });
+    const res = await request(app).post("/9/retry");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "wanted" });
+    expect(mockRetryFailedRequest).toHaveBeenCalledWith(9);
+  });
+
+  it("reports a retry failure to the user", async () => {
+    mockRetryFailedRequest.mockResolvedValue({
+      status: "failed",
+      error: "Album not found",
+    });
+    const res = await request(app).post("/9/retry");
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("Album not found");
+  });
+
+  it("removes only failed request history", async () => {
+    mockRemoveFailedRequest.mockResolvedValue({ status: "removed" });
+    const res = await request(app).delete("/9");
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("removed");
+    expect(mockRemoveFailedRequest).toHaveBeenCalledWith(9);
+  });
+
+  it("rejects deleting an active request", async () => {
+    mockRemoveFailedRequest.mockResolvedValue({ status: "not_failed" });
+    const res = await request(app).delete("/9");
+    expect(res.status).toBe(409);
+  });
 });
 
 describe("POST /", () => {
@@ -150,6 +188,7 @@ describe("GET /", () => {
       artistName: "Artist",
       albumTitle: "Album",
       status: "approved",
+      retryable: false,
       createdAt: "2024-01-01",
       updatedAt: "2024-01-01",
       approvedAt: null,
@@ -207,6 +246,7 @@ describe("GET /", () => {
     const res = await request(app).get("/");
     expect(res.status).toBe(200);
     expect(res.body[0].lidarr.status).toBe("failed");
+    expect(res.body[0].retryable).toBe(true);
   });
 
   it("does not attach a lidarr lifecycle to non-approved requests", async () => {

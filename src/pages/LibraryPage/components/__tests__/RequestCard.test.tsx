@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import RequestCard from "../RequestCard";
 import { RequestItem } from "@/types";
 
@@ -21,6 +21,52 @@ describe("RequestCard", () => {
 
     expect(screen.getByText("OK Computer")).toBeInTheDocument();
     expect(screen.getByText("Radiohead")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "OK Computer" })).toHaveAttribute(
+      "href",
+      "/album/abc-123"
+    );
+  });
+
+  it("offers retry and history removal for a failed request", async () => {
+    const onRetry = vi.fn().mockResolvedValue(undefined);
+    const onRemove = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const failed = {
+      ...baseRequest,
+      status: "approved" as const,
+      retryable: true,
+    };
+    render(
+      <RequestCard
+        request={failed}
+        index={0}
+        showFailedActions
+        onRetry={onRetry}
+        onRemove={onRemove}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry request" }));
+    await waitFor(() => expect(onRetry).toHaveBeenCalledWith(1));
+    fireEvent.click(screen.getByRole("button", { name: "Remove request" }));
+    await waitFor(() => expect(onRemove).toHaveBeenCalledWith(1));
+  });
+
+  it("shows a retry error without removing the request", async () => {
+    const onRetry = vi.fn().mockRejectedValue(new Error("Album not found"));
+    render(
+      <RequestCard
+        request={{ ...baseRequest, status: "approved", retryable: true }}
+        index={0}
+        showFailedActions
+        onRetry={onRetry}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry request" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Album not found"
+    );
+    expect(screen.getByText("OK Computer")).toBeInTheDocument();
   });
 
   it("renders status badge", () => {

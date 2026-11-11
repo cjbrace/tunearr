@@ -116,8 +116,16 @@ export default function LibraryPage() {
     }),
     [showMine, user?.id, filters.status]
   );
-  const { requests, loading, error, approveRequest, declineRequest, refresh } =
-    useRequests(requestsOptions);
+  const {
+    requests,
+    loading,
+    error,
+    approveRequest,
+    declineRequest,
+    retryFailedRequest,
+    removeFailedRequest,
+    refresh,
+  } = useRequests(requestsOptions);
   const {
     items: wantedItems,
     loading: wantedLoading,
@@ -228,8 +236,11 @@ export default function LibraryPage() {
             showUser={effectiveShowAll}
             showActions={canManageRequests && effectiveShowAll}
             showAdminDetails={isAdmin}
+            showFailedActions={canManageRequests}
             onApprove={approveRequest}
             onDecline={declineRequest}
+            onRetry={retryFailedRequest}
+            onRemove={removeFailedRequest}
             onSearch={handleSearch}
             onUnmonitor={handleUnmonitor}
           />

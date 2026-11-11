@@ -20,6 +20,12 @@ export type MusicBrainzSearchResponse = {
   offset: number;
 };
 
+export type MusicBrainzBrowseReleaseGroupsResponse = {
+  "release-groups": MusicBrainzReleaseGroup[];
+  "release-group-count": number;
+  "release-group-offset": number;
+};
+
 export type MusicBrainzArtist = {
   id: string;
   name: string;

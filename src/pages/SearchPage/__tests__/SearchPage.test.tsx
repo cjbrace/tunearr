@@ -126,6 +126,24 @@ describe("SearchPage", () => {
     expect(screen.getByText("OK Computer")).toBeInTheDocument();
   });
 
+  it("shows soundtrack matches in their own section before other albums", () => {
+    mockSearchState.albums = [
+      makeAlbum("rg-1", "Other Inception"),
+      {
+        ...makeAlbum("rg-2", "Inception: Music From the Motion Picture"),
+        "secondary-types": ["Soundtrack"],
+      },
+    ];
+
+    const { container } = renderSearchPage("Inception");
+    const headings = within(container).getAllByRole("heading", { level: 2 });
+    expect(headings.map((h) => h.textContent)).toEqual([
+      "Soundtracks",
+      "Albums",
+    ]);
+    expect(screen.getAllByTestId("release-card")).toHaveLength(2);
+  });
+
   it("orders the artist section before the album section", () => {
     mockSearchState.artists = [{ mbid: "a1", name: "Radiohead" }];
     mockSearchState.albums = [makeAlbum("rg-1", "OK Computer")];

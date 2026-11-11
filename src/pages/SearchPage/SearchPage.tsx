@@ -94,6 +94,40 @@ export default function SearchPage() {
   );
 
   const hasResults = artists.length > 0 || albums.length > 0;
+  const soundtracks = albums.filter((rg) =>
+    rg["secondary-types"]?.some((type) => type.toLowerCase() === "soundtrack")
+  );
+  const otherAlbums = albums.filter(
+    (rg) =>
+      !rg["secondary-types"]?.some(
+        (type) => type.toLowerCase() === "soundtrack"
+      )
+  );
+
+  const albumSection = (title: string, items: typeof albums) => (
+    <section>
+      <h2 className={SECTION_HEADING_CLASS}>{title}</h2>
+      <div className={ALBUM_GRID_CLASS}>
+        {items.map((rg, index) => (
+          <div
+            key={rg.id}
+            className="cascade-deal-in"
+            style={
+              {
+                "--deal-index": index,
+                "--deal-rotate": `${DEAL_ROTATIONS[index % DEAL_ROTATIONS.length]}deg`,
+              } as React.CSSProperties
+            }
+          >
+            <ReleaseGroupCard
+              releaseGroup={rg}
+              library={getAlbumLibrary(rg.id)}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 
   return (
     <div>
@@ -128,30 +162,8 @@ export default function SearchPage() {
             </section>
           )}
 
-          {albums.length > 0 && (
-            <section>
-              <h2 className={SECTION_HEADING_CLASS}>Albums</h2>
-              <div className={ALBUM_GRID_CLASS}>
-                {albums.map((rg, index) => (
-                  <div
-                    key={rg.id}
-                    className="cascade-deal-in"
-                    style={
-                      {
-                        "--deal-index": index,
-                        "--deal-rotate": `${DEAL_ROTATIONS[index % DEAL_ROTATIONS.length]}deg`,
-                      } as React.CSSProperties
-                    }
-                  >
-                    <ReleaseGroupCard
-                      releaseGroup={rg}
-                      library={getAlbumLibrary(rg.id)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          {soundtracks.length > 0 && albumSection("Soundtracks", soundtracks)}
+          {otherAlbums.length > 0 && albumSection("Albums", otherAlbums)}
         </div>
       )}
 

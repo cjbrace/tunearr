@@ -47,6 +47,11 @@ export async function saveRequest(request: Request): Promise<Request> {
   return repo().save(request);
 }
 
+/** Remove request history only; Lidarr monitoring and files are untouched. */
+export async function deleteRequest(request: Request): Promise<void> {
+  await repo().remove(request);
+}
+
 export async function saveRequests(requests: Request[]): Promise<void> {
   await repo().save(requests);
 }
