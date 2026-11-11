@@ -9,6 +9,7 @@ import useAlbumActions from "../hooks/useAlbumActions";
 import { pastelColorFromId } from "../utils/color";
 import { ReleaseGroup } from "../types";
 import { albumLibraryTitle, type AlbumLibraryInfo } from "@shared/albumLibrary";
+import { releaseKind, RELEASE_KIND_LABELS } from "@/utils/releaseFilters";
 
 interface ReleaseGroupCardProps {
   releaseGroup: ReleaseGroup;
@@ -21,7 +22,10 @@ export default function ReleaseGroupCard({
 }: ReleaseGroupCardProps) {
   const navigate = useNavigate();
   const haptics = useHaptics();
-  const actions = useAlbumActions({ releaseGroup });
+  const actions = useAlbumActions({
+    releaseGroup,
+    inLibrary: !!library && library.state !== "local",
+  });
 
   const artistName =
     releaseGroup["artist-credit"]?.[0]?.artist?.name || "Unknown Artist";
@@ -29,6 +33,7 @@ export default function ReleaseGroupCard({
   const albumMbid = releaseGroup.id;
   const year = releaseGroup["first-release-date"]?.slice(0, 4) || "";
   const listeners = releaseGroup.popularity?.listeners;
+  const kind = releaseKind(releaseGroup);
   const pastelBg = useMemo(() => pastelColorFromId(albumMbid), [albumMbid]);
   const coverUrl = `https://coverartarchive.org/release-group/${albumMbid}/front-500`;
 
@@ -59,7 +64,11 @@ export default function ReleaseGroupCard({
   ) : null;
 
   return (
-    <ContextMenu options={actions.contextOptions} title={albumTitle}>
+    <ContextMenu
+      options={actions.contextOptions}
+      title={albumTitle}
+      className="relative"
+    >
       <button
         type="button"
         onClick={handleClick}
@@ -80,6 +89,11 @@ export default function ReleaseGroupCard({
           <p className="text-gray-500 dark:text-gray-400 text-sm truncate">
             {artistName}
           </p>
+          {kind !== "album" && (
+            <p className="text-xs text-violet-600 dark:text-violet-300">
+              {RELEASE_KIND_LABELS[kind]}
+            </p>
+          )}
           {year && (
             <p className="text-gray-400 dark:text-gray-500 text-xs">{year}</p>
           )}
@@ -114,6 +128,11 @@ export default function ReleaseGroupCard({
           <p className="text-gray-500 dark:text-gray-400 text-xs truncate">
             {artistName}
           </p>
+          {kind !== "album" && (
+            <p className="text-xs text-violet-600 dark:text-violet-300">
+              {RELEASE_KIND_LABELS[kind]}
+            </p>
+          )}
           {year && (
             <p className="text-gray-400 dark:text-gray-500 text-xs mt-0.5">
               {year}
@@ -129,6 +148,22 @@ export default function ReleaseGroupCard({
           )}
         </div>
       </button>
+
+      {!actions.disabled && (
+        <button
+          type="button"
+          onClick={actions.handleMonitorClick}
+          aria-label={`Request ${albumTitle} by ${artistName}`}
+          className="absolute z-10 left-2 top-2 rounded-lg border-2 border-black bg-pink-400 px-2 py-1 text-xs font-bold text-black shadow-cartoon-sm"
+        >
+          Request
+        </button>
+      )}
+      {actions.errorMsg && (
+        <p role="alert" className="mt-1 text-xs text-rose-500">
+          {actions.errorMsg}
+        </p>
+      )}
 
       <AlbumActionModals actions={actions} />
     </ContextMenu>

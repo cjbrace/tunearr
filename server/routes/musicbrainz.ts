@@ -7,6 +7,8 @@ import {
   getReleaseGroupLabel,
   getReleaseGroupDate,
   getAlbumDetails,
+  searchReleaseGroupsPage,
+  fetchArtistReleaseGroupsPage,
 } from "../api/musicbrainz/releaseGroups";
 import {
   getArtistById,
@@ -27,6 +29,17 @@ const router = express.Router();
 
 const ARTIST_SCORE_THRESHOLD = 85;
 const ARTIST_RESULT_LIMIT = 5;
+const PAGE_SIZE = 100;
+
+function pageOffset(value: unknown): number | null {
+  const offset = Number(value ?? 0);
+  return Number.isInteger(offset) &&
+    offset >= 0 &&
+    offset <= 10000 &&
+    offset % PAGE_SIZE === 0
+    ? offset
+    : null;
+}
 
 /** Keep only the strongest artist matches so they don't bury album results */
 function topArtists(artists: ArtistInfo[]): ArtistInfo[] {
@@ -90,6 +103,39 @@ router.get("/search", async (req: Request, res: Response) => {
   });
 });
 
+router.get("/search/page", async (req: Request, res: Response) => {
+  const q = req.query.q;
+  const offset = pageOffset(req.query.offset);
+  if (typeof q !== "string" || !q.trim() || offset === null) {
+    return res.status(400).json({ error: "Valid q and offset are required" });
+  }
+  res.json(await searchReleaseGroupsPage(q.trim(), offset));
+});
+
+router.get("/search/artists", async (req: Request, res: Response) => {
+  const q = req.query.q;
+  if (typeof q !== "string" || !q.trim()) {
+    return res.status(400).json({ error: "Query parameter q is required" });
+  }
+  const artists = topArtists(await searchArtists(q.trim()));
+  res.json({ artists: await enrichArtistsWithImages(artists) });
+});
+
+router.post("/popularity", async (req: Request, res: Response) => {
+  const ids = req.body?.ids;
+  if (
+    !Array.isArray(ids) ||
+    ids.length > 500 ||
+    !ids.every((id) => typeof id === "string")
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Up to 500 release-group IDs are required" });
+  }
+  const popularity = await getReleaseGroupPopularity(ids);
+  res.json(Object.fromEntries(popularity));
+});
+
 router.get("/artist/search", async (req: Request, res: Response) => {
   const { q } = req.query;
   if (typeof q !== "string") {
@@ -115,6 +161,19 @@ router.get(
     const { mbid } = req.params;
     const releaseGroups = await fetchReleaseGroupsForArtist(mbid as string);
     res.json({ releaseGroups: await withPopularity(releaseGroups) });
+  }
+);
+
+router.get(
+  "/artist/:mbid/release-groups/page",
+  async (req: Request, res: Response) => {
+    const offset = pageOffset(req.query.offset);
+    if (offset === null) {
+      return res.status(400).json({ error: "Valid offset is required" });
+    }
+    res.json(
+      await fetchArtistReleaseGroupsPage(req.params.mbid as string, offset)
+    );
   }
 );
 

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSearchReleaseGroups = vi.fn();
+const mockSearchReleaseGroupsPage = vi.fn();
 const mockFetchReleaseGroupsForArtist = vi.fn();
+const mockFetchArtistReleaseGroupsPage = vi.fn();
 const mockGetReleaseTracks = vi.fn();
 const mockEnrichTracksWithPreviews = vi.fn();
 const mockGetReleaseGroupLabel = vi.fn();
@@ -19,8 +21,12 @@ const mockGetReleaseGroupPopularity = vi.fn();
 
 vi.mock("../api/musicbrainz/releaseGroups", () => ({
   searchReleaseGroups: (...args: unknown[]) => mockSearchReleaseGroups(...args),
+  searchReleaseGroupsPage: (...args: unknown[]) =>
+    mockSearchReleaseGroupsPage(...args),
   fetchReleaseGroupsForArtist: (...args: unknown[]) =>
     mockFetchReleaseGroupsForArtist(...args),
+  fetchArtistReleaseGroupsPage: (...args: unknown[]) =>
+    mockFetchArtistReleaseGroupsPage(...args),
   getReleaseGroupLabel: (...args: unknown[]) =>
     mockGetReleaseGroupLabel(...args),
   getReleaseGroupDate: (...args: unknown[]) => mockGetReleaseGroupDate(...args),
@@ -75,6 +81,34 @@ app.use("/", musicbrainzRouter);
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetReleaseGroupPopularity.mockResolvedValue(new Map());
+});
+
+describe("paged discovery", () => {
+  it("returns one search page without loading the full catalog", async () => {
+    const page = { "release-groups": [{ id: "one" }], count: 205, offset: 0 };
+    mockSearchReleaseGroupsPage.mockResolvedValue(page);
+    const res = await request(app).get("/search/page?q=inception&offset=0");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(page);
+    expect(mockSearchReleaseGroupsPage).toHaveBeenCalledWith("inception", 0);
+    expect(mockSearchReleaseGroups).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid page offset", async () => {
+    const res = await request(app).get("/search/page?q=inception&offset=7");
+    expect(res.status).toBe(400);
+  });
+
+  it("returns only relevant artist matches", async () => {
+    mockSearchArtists.mockResolvedValue([
+      { mbid: "a", name: "Hans Zimmer", score: 100 },
+      { mbid: "b", name: "Other", score: 50 },
+    ]);
+    mockGetArtistsImages.mockResolvedValue(new Map());
+    const res = await request(app).get("/search/artists?q=Hans+Zimmer");
+    expect(res.status).toBe(200);
+    expect(res.body.artists).toHaveLength(1);
+  });
 });
 
 describe("GET /search", () => {

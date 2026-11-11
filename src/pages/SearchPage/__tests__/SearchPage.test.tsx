@@ -7,6 +7,14 @@ let mockSearchState: {
   albums: ReleaseGroup[];
   artists: ArtistSearchResult[];
   loading: boolean;
+  loadingMore: boolean;
+  ranking: boolean;
+  popularityUnavailable: boolean;
+  complete: boolean;
+  loaded: number;
+  total: number;
+  moreAvailable: boolean;
+  loadMore: ReturnType<typeof vi.fn>;
   error: string | null;
   search: ReturnType<typeof vi.fn>;
 };
@@ -17,6 +25,19 @@ let libraryArtistMbids: string[] = [];
 vi.mock("@/hooks/useSearch", () => ({
   default: () => mockSearchState,
 }));
+
+vi.mock("@/hooks/useDiscoveryFilters", () => ({
+  default: () => ({
+    filters: { excluded: [], sort: "popular" },
+    setFilters: vi.fn(),
+    save: vi.fn(),
+    changed: false,
+    saving: false,
+    error: null,
+  }),
+}));
+
+vi.mock("@/components/DiscoveryControls", () => ({ default: () => null }));
 
 vi.mock("@/hooks/useNavigateToArtist", () => ({
   default: () => ({ go: vi.fn(), resolving: false }),
@@ -89,6 +110,14 @@ beforeEach(() => {
     albums: [],
     artists: [],
     loading: false,
+    loadingMore: false,
+    ranking: false,
+    popularityUnavailable: false,
+    complete: true,
+    loaded: 0,
+    total: 0,
+    moreAvailable: false,
+    loadMore: vi.fn(),
     error: null,
     search: vi.fn(),
   };
@@ -121,12 +150,12 @@ describe("SearchPage", () => {
     renderSearchPage("Radiohead");
 
     expect(screen.getByText("Artists")).toBeInTheDocument();
-    expect(screen.getByText("Albums")).toBeInTheDocument();
+    expect(screen.getByText("All releases")).toBeInTheDocument();
     expect(screen.getByText("Radiohead")).toBeInTheDocument();
     expect(screen.getByText("OK Computer")).toBeInTheDocument();
   });
 
-  it("shows soundtrack matches in their own section before other albums", () => {
+  it("shows soundtrack matches in the all-releases section", () => {
     mockSearchState.albums = [
       makeAlbum("rg-1", "Other Inception"),
       {
@@ -137,10 +166,7 @@ describe("SearchPage", () => {
 
     const { container } = renderSearchPage("Inception");
     const headings = within(container).getAllByRole("heading", { level: 2 });
-    expect(headings.map((h) => h.textContent)).toEqual([
-      "Soundtracks",
-      "Albums",
-    ]);
+    expect(headings.map((h) => h.textContent)).toEqual(["All releases"]);
     expect(screen.getAllByTestId("release-card")).toHaveLength(2);
   });
 
@@ -167,7 +193,10 @@ describe("SearchPage", () => {
 
     const { container } = renderSearchPage("Radiohead");
     const headings = within(container).getAllByRole("heading", { level: 2 });
-    expect(headings.map((h) => h.textContent)).toEqual(["Artists", "Albums"]);
+    expect(headings.map((h) => h.textContent)).toEqual([
+      "Artists",
+      "All releases",
+    ]);
   });
 
   it("omits the artists section when there are no artist results", () => {
@@ -176,7 +205,7 @@ describe("SearchPage", () => {
     renderSearchPage("OK");
 
     expect(screen.queryByText("Artists")).not.toBeInTheDocument();
-    expect(screen.getByText("Albums")).toBeInTheDocument();
+    expect(screen.getByText("All releases")).toBeInTheDocument();
   });
 
   it("shows the no-results state when a query returns nothing", () => {

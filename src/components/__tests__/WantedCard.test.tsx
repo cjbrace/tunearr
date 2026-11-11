@@ -64,7 +64,7 @@ vi.mock("../../hooks/useFollowedArtists", () => ({
   }),
 }));
 
-vi.mock("../PurchaseLinksModal", () => ({
+vi.mock("../RequestAlbumModal", () => ({
   default: ({ isOpen }: { isOpen: boolean }) =>
     isOpen ? <div data-testid="purchase-modal" /> : null,
 }));

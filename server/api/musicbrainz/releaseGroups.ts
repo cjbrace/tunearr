@@ -29,6 +29,55 @@ const PAGE_SIZE = 100;
 const MAX_SEARCH_RESULTS = 500;
 const MAX_ARTIST_RELEASE_GROUPS = 500;
 
+/** One paced MusicBrainz request, cached separately so the first page can render. */
+export function searchReleaseGroupsPage(
+  query: string,
+  offset: number,
+  priority: MbPriority = "interactive"
+): Promise<ReleaseGroupSearchResult> {
+  return mbCached(
+    {
+      key: `rg-search-page:${query.trim().toLowerCase()}:${offset}`,
+      ttlSeconds: MB_TTL.volatile,
+      priority,
+      strategy: "revalidate",
+    },
+    async (p) => {
+      const url = `${MB_BASE}/release-group/?query=${encodeURIComponent(query)}&limit=${PAGE_SIZE}&offset=${offset}&fmt=json`;
+      const data = await mbJson<MusicBrainzSearchResponse>(url, p);
+      return {
+        "release-groups": data?.["release-groups"] ?? [],
+        count: data?.count ?? 0,
+        offset,
+      };
+    }
+  );
+}
+
+export function fetchArtistReleaseGroupsPage(
+  artistId: string,
+  offset: number,
+  priority: MbPriority = "interactive"
+): Promise<MusicBrainzBrowseReleaseGroupsResponse> {
+  return mbCached(
+    {
+      key: `artist-rgs-page:${artistId}:${offset}`,
+      ttlSeconds: MB_TTL.volatile,
+      priority,
+      strategy: "revalidate",
+    },
+    async (p) => {
+      const url = `${MB_BASE}/release-group?artist=${artistId}&limit=${PAGE_SIZE}&offset=${offset}&inc=artist-credits&fmt=json`;
+      const data = await mbJson<MusicBrainzBrowseReleaseGroupsResponse>(url, p);
+      return {
+        "release-groups": data?.["release-groups"] ?? [],
+        "release-group-count": data?.["release-group-count"] ?? 0,
+        "release-group-offset": offset,
+      };
+    }
+  );
+}
+
 async function loadReleaseGroupSearch(
   query: string,
   priority: MbPriority

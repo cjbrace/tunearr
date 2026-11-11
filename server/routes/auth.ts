@@ -20,6 +20,10 @@ import {
 import { validateSession } from "../auth/sessions";
 import { getPlexAccountFull } from "../api/plex/account";
 import { getServerAccessToken } from "../api/plex/servers";
+import {
+  DEFAULT_DISCOVERY_FILTERS,
+  isDiscoveryFilters,
+} from "../../shared/discoveryFilters";
 
 const TUNEARR_SERVER_CLIENT_ID = "tunearr-server";
 
@@ -50,6 +54,7 @@ function userResponse(user: AuthUser) {
     userType: user.userType,
     permissions: user.permissions,
     theme: user.theme,
+    discoveryFilters: user.discoveryFilters ?? DEFAULT_DISCOVERY_FILTERS,
     thumb: user.thumb,
     hasPlexToken: user.hasPlexToken,
   };
@@ -334,7 +339,7 @@ router.patch(
   requireAuth,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { theme } = req.body;
+      const { theme, discoveryFilters } = req.body;
 
       if (theme !== undefined) {
         if (!VALID_THEMES.includes(theme)) {
@@ -346,7 +351,18 @@ router.patch(
         }
       }
 
-      await updateUserPreferences(req.user!.id, { theme });
+      if (
+        discoveryFilters !== undefined &&
+        !isDiscoveryFilters(discoveryFilters)
+      ) {
+        const err = new Error("Invalid discovery filters") as Error & {
+          status: number;
+        };
+        err.status = 400;
+        throw err;
+      }
+
+      await updateUserPreferences(req.user!.id, { theme, discoveryFilters });
 
       res.json({ success: true });
     } catch (err) {

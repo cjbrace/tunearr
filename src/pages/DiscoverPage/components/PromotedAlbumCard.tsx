@@ -4,7 +4,7 @@ import type { PromotedAlbumData } from "@/hooks/usePromotedAlbums";
 import MonitorButton from "@/components/MonitorButton";
 import OptionSelect from "@/components/OptionSelect";
 import useHaptics from "@/hooks/useHaptics";
-import PurchaseLinksModal from "@/components/PurchaseLinksModal";
+import RequestAlbumModal from "@/components/RequestAlbumModal";
 import RecommendationTraceModal from "./RecommendationTraceModal";
 import TracksPreviewModal from "./TracksPreviewModal";
 import { MusicalNoteIcon } from "@/components/icons";
@@ -177,12 +177,11 @@ export default function PromotedAlbumCard({ data }: PromotedAlbumCardProps) {
         isTrackPlaying={isTrackPlaying}
       />
 
-      <PurchaseLinksModal
+      <RequestAlbumModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         artistName={album.artistName}
         albumTitle={album.name}
-        albumMbid={album.mbid}
         onAddToLibrary={handleAddToLibrary}
       />
 

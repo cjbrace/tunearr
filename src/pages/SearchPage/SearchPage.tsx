@@ -7,7 +7,9 @@ import Skeleton from "@/components/Skeleton";
 import useSearch from "@/hooks/useSearch";
 import useLibraryAlbums from "@/hooks/useLibraryAlbums";
 import useLibraryArtists from "@/hooks/useLibraryArtists";
-import { compareSearchReleases } from "@/utils/releasePopularity";
+import useDiscoveryFilters from "@/hooks/useDiscoveryFilters";
+import DiscoveryControls from "@/components/DiscoveryControls";
+import { filterAndSortReleases } from "@/utils/releaseFilters";
 
 const DEAL_ROTATIONS = [-4, 3.5, -3, 4.5, -3.5, 3];
 
@@ -65,7 +67,22 @@ function SearchSkeletons() {
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { albums, artists, loading, error, search } = useSearch();
+  const {
+    albums,
+    artists,
+    loading,
+    loadingMore,
+    ranking,
+    popularityUnavailable,
+    complete,
+    loaded,
+    total,
+    moreAvailable,
+    loadMore,
+    error,
+    search,
+  } = useSearch();
+  const discovery = useDiscoveryFilters();
   const { getAlbumLibrary } = useLibraryAlbums();
   const { isArtistInLibrary } = useLibraryArtists();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,9 +90,7 @@ export default function SearchPage() {
   const query = searchParams.get("q") ?? "";
 
   useEffect(() => {
-    if (query) {
-      search(query);
-    }
+    search(query);
   }, [query, search]);
 
   useEffect(() => {
@@ -95,18 +110,9 @@ export default function SearchPage() {
   );
 
   const hasResults = artists.length > 0 || albums.length > 0;
-  const rankedAlbums = useMemo(
-    () => [...albums].sort(compareSearchReleases),
-    [albums]
-  );
-  const soundtracks = rankedAlbums.filter((rg) =>
-    rg["secondary-types"]?.some((type) => type.toLowerCase() === "soundtrack")
-  );
-  const otherAlbums = rankedAlbums.filter(
-    (rg) =>
-      !rg["secondary-types"]?.some(
-        (type) => type.toLowerCase() === "soundtrack"
-      )
+  const visibleAlbums = useMemo(
+    () => filterAndSortReleases(albums, discovery.filters, "search"),
+    [albums, discovery.filters]
   );
 
   const albumSection = (title: string, items: typeof albums) => (
@@ -144,11 +150,35 @@ export default function SearchPage() {
         inputRef={inputRef}
       />
 
+      <DiscoveryControls
+        {...discovery}
+        onChange={discovery.setFilters}
+        onSave={discovery.save}
+      />
+      {query && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-3 text-sm text-gray-600 dark:text-gray-300"
+        >
+          {error
+            ? "Search interrupted"
+            : complete
+              ? `Complete · ${loaded} of ${total} releases`
+              : moreAvailable
+                ? `${loaded} of ${total} releases loaded · Load more to complete`
+                : ranking
+                  ? `Ranking · ${loaded} of ${total} releases loaded`
+                  : `Loading · ${loaded} of ${total} releases loaded`}
+          {popularityUnavailable && " · Listener counts unavailable"}
+        </div>
+      )}
+
       {loading && <SearchSkeletons />}
 
       {error && <p className="text-rose-500 mt-4">Error: {error}</p>}
 
-      {!loading && !error && hasResults && (
+      {!loading && hasResults && (
         <div className="mt-6 space-y-8">
           {artists.length > 0 && (
             <section>
@@ -167,17 +197,34 @@ export default function SearchPage() {
             </section>
           )}
 
-          {albums.some((rg) => rg.popularity) && (
+          {visibleAlbums.some((rg) => rg.popularity) && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Albums are ranked by title match and ListenBrainz listeners.
+              Releases are ranked by title match and ListenBrainz listeners.
             </p>
           )}
-          {soundtracks.length > 0 && albumSection("Soundtracks", soundtracks)}
-          {otherAlbums.length > 0 && albumSection("Albums", otherAlbums)}
+          {visibleAlbums.length > 0 &&
+            albumSection("All releases", visibleAlbums)}
+          {albums.length > 0 && visibleAlbums.length === 0 && (
+            <p className="text-sm text-gray-500">
+              No releases match your filters.
+            </p>
+          )}
+          {moreAvailable && (
+            <button
+              type="button"
+              onClick={() => void loadMore()}
+              disabled={loadingMore}
+              className="rounded-lg border-2 border-black bg-amber-300 px-4 py-2 font-semibold disabled:opacity-50"
+            >
+              {loadingMore
+                ? "Loading..."
+                : `Load more (${total - loaded} remaining)`}
+            </button>
+          )}
         </div>
       )}
 
-      {!loading && !error && !hasResults && (
+      {!loading && !error && !hasResults && (!query || complete) && (
         <div className="mt-16 flex flex-col items-center text-gray-400 animate-fade-in">
           <svg
             className="w-16 h-16 mb-4"

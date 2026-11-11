@@ -171,7 +171,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const updatePreferences = useCallback(
-    async (prefs: { theme?: AuthUser["theme"] }) => {
+    async (prefs: {
+      theme?: AuthUser["theme"];
+      discoveryFilters?: AuthUser["discoveryFilters"];
+    }) => {
       await patchPreferences(prefs);
       setUser((prev) => (prev ? { ...prev, ...prefs } : prev));
     },

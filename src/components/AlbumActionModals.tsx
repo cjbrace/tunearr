@@ -1,4 +1,4 @@
-import PurchaseLinksModal from "./PurchaseLinksModal";
+import RequestAlbumModal from "./RequestAlbumModal";
 import PurchasePriceModal from "./PurchasePriceModal";
 import type { AlbumActions } from "../hooks/useAlbumActions";
 
@@ -9,12 +9,11 @@ interface AlbumActionModalsProps {
 export default function AlbumActionModals({ actions }: AlbumActionModalsProps) {
   return (
     <>
-      <PurchaseLinksModal
+      <RequestAlbumModal
         isOpen={actions.isLinksModalOpen}
         onClose={actions.closeLinksModal}
         artistName={actions.artistName}
         albumTitle={actions.albumTitle}
-        albumMbid={actions.albumMbid}
         onAddToLibrary={actions.handleAddToLibrary}
       />
       <PurchasePriceModal

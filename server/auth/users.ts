@@ -3,6 +3,10 @@ import { User } from "../db/entity/User";
 import type { AuthUser } from "./types";
 import { hashPassword, verifyPassword } from "./password";
 import { Permission } from "../../shared/permissions";
+import {
+  DEFAULT_DISCOVERY_FILTERS,
+  parseDiscoveryFilters,
+} from "../../shared/discoveryFilters";
 
 function toAuthUser(row: User): AuthUser {
   return {
@@ -12,6 +16,7 @@ function toAuthUser(row: User): AuthUser {
     permissions: row.permissions,
     enabled: !!row.enabled,
     theme: row.theme,
+    discoveryFilters: parseDiscoveryFilters(row.discovery_filters),
     thumb: row.plex_thumb ?? null,
     hasPlexToken: !!row.plex_token,
     plexToken: row.plex_token ?? null,
@@ -49,6 +54,7 @@ export async function createAdminUser(
     permissions: Permission.ADMIN,
     enabled: true,
     theme: "system",
+    discoveryFilters: DEFAULT_DISCOVERY_FILTERS,
     thumb: null,
     hasPlexToken: false,
     plexToken: null,
@@ -106,6 +112,7 @@ export async function createPlexAdminUser(
     permissions: Permission.ADMIN,
     enabled: true,
     theme: "system",
+    discoveryFilters: DEFAULT_DISCOVERY_FILTERS,
     thumb: plexThumb,
     hasPlexToken: true,
     plexToken,
@@ -164,6 +171,7 @@ export async function findOrCreatePlexUser(
     permissions: Permission.REQUEST,
     enabled: true,
     theme: "system",
+    discoveryFilters: DEFAULT_DISCOVERY_FILTERS,
     thumb: plexThumb,
     hasPlexToken: true,
     plexToken,
@@ -239,14 +247,22 @@ export async function updateUserPlexToken(
 
 export async function updateUserPreferences(
   userId: number,
-  prefs: { theme?: AuthUser["theme"] }
+  prefs: {
+    theme?: AuthUser["theme"];
+    discoveryFilters?: AuthUser["discoveryFilters"];
+  }
 ): Promise<void> {
-  if (prefs.theme) {
+  if (prefs.theme || prefs.discoveryFilters) {
     const repo = getDataSource().getRepository(User);
     await repo
       .createQueryBuilder()
       .update()
-      .set({ theme: prefs.theme })
+      .set({
+        ...(prefs.theme ? { theme: prefs.theme } : {}),
+        ...(prefs.discoveryFilters
+          ? { discovery_filters: JSON.stringify(prefs.discoveryFilters) }
+          : {}),
+      })
       .where("id = :id", { id: userId })
       .callListeners(false)
       .execute();

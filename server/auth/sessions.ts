@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { getDataSource } from "../db";
 import { Session } from "../db/entity/Session";
 import type { AuthUser } from "./types";
+import { parseDiscoveryFilters } from "../../shared/discoveryFilters";
 
 const SESSION_EXPIRY_DAYS = 30;
 
@@ -49,6 +50,7 @@ export async function validateSession(token: string): Promise<AuthUser | null> {
     permissions: user.permissions,
     enabled: true,
     theme: user.theme,
+    discoveryFilters: parseDiscoveryFilters(user.discovery_filters),
     thumb: user.plex_thumb ?? null,
     hasPlexToken: !!user.plex_token,
     plexToken: user.plex_token ?? null,

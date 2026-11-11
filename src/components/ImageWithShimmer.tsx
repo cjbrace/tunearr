@@ -41,6 +41,7 @@ export default function ImageWithShimmer({
         />
       )}
       <img
+        loading="lazy"
         src={src}
         alt={alt}
         className={`${className} ${isLoading ? "opacity-0" : "opacity-100"} transition-opacity duration-300`}

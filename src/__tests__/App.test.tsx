@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import App from "../App";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   SettingsContext,
   type SettingsContextValue,
@@ -81,22 +82,24 @@ vi.stubGlobal(
 
 function renderApp(path: string, context = connectedContext) {
   return render(
-    <AuthContext.Provider value={authenticatedAuth}>
-      <SettingsContext.Provider value={context}>
-        <ThemeContext.Provider
-          value={{
-            theme: "system",
-            actualTheme: "light",
-            setTheme: vi.fn(),
-            isLoading: false,
-          }}
-        >
-          <MemoryRouter initialEntries={[path]}>
-            <App />
-          </MemoryRouter>
-        </ThemeContext.Provider>
-      </SettingsContext.Provider>
-    </AuthContext.Provider>
+    <QueryClientProvider client={new QueryClient()}>
+      <AuthContext.Provider value={authenticatedAuth}>
+        <SettingsContext.Provider value={context}>
+          <ThemeContext.Provider
+            value={{
+              theme: "system",
+              actualTheme: "light",
+              setTheme: vi.fn(),
+              isLoading: false,
+            }}
+          >
+            <MemoryRouter initialEntries={[path]}>
+              <App />
+            </MemoryRouter>
+          </ThemeContext.Provider>
+        </SettingsContext.Provider>
+      </AuthContext.Provider>
+    </QueryClientProvider>
   );
 }
 

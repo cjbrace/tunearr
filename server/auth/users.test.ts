@@ -330,6 +330,17 @@ describe("linkPlexAccount", () => {
 });
 
 describe("updateUserPreferences", () => {
+  it("persists release exclusions for the account", async () => {
+    const user = await createAdminUser("admin", "password123");
+    await updateUserPreferences(user.id, {
+      discoveryFilters: { excluded: ["live"], sort: "popular" },
+    });
+    const found = await findUserById(user.id);
+    expect(found?.discoveryFilters).toEqual({
+      excluded: ["live"],
+      sort: "popular",
+    });
+  });
   it("updates the user theme", async () => {
     const user = await createAdminUser("admin", "password123");
     await updateUserPreferences(user.id, { theme: "dark" });

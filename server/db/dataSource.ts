@@ -34,6 +34,7 @@ import { LiveEvents1721000000000 } from "./migration/13_LiveEvents";
 import { LiveEventPerformerGenres1722000000000 } from "./migration/14_LiveEventPerformerGenres";
 import { LiveQuotaUsage1723000000000 } from "./migration/15_LiveQuotaUsage";
 import { PromotedAlbumSnapshots1724000000000 } from "./migration/16_PromotedAlbumSnapshots";
+import { DiscoveryFilters1725000000000 } from "./migration/17_DiscoveryFilters";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -86,6 +87,7 @@ export function createDataSource(dbPath?: string): DataSource {
       LiveEventPerformerGenres1722000000000,
       LiveQuotaUsage1723000000000,
       PromotedAlbumSnapshots1724000000000,
+      DiscoveryFilters1725000000000,
     ],
     synchronize: false,
     migrationsRun: true,

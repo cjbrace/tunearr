@@ -60,7 +60,7 @@ vi.mock("@/hooks/useAudioPreview", () => ({
   }),
 }));
 
-vi.mock("@/components/PurchaseLinksModal", () => ({
+vi.mock("@/components/RequestAlbumModal", () => ({
   default: ({
     isOpen,
     onClose,

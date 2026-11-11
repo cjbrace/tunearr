@@ -53,6 +53,7 @@ describe("InitialSchema migration", () => {
       "live_imminent_days_local",
       "live_imminent_days_regional",
       "live_banner_enabled",
+      "discovery_filters",
     ]);
   });
 

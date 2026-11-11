@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { DiscoveryFilters } from "@shared/discoveryFilters";
 
 export type AuthUser = {
   id: number;
@@ -6,6 +7,7 @@ export type AuthUser = {
   userType: "local" | "plex";
   permissions: number;
   theme: "light" | "dark" | "system";
+  discoveryFilters?: DiscoveryFilters;
   thumb: string | null;
   hasPlexToken: boolean;
 };
@@ -22,7 +24,10 @@ export interface AuthContextValue {
   setup: (username: string, password: string) => Promise<void>;
   plexSetup: () => Promise<void>;
   linkPlex: () => Promise<void>;
-  updatePreferences: (prefs: { theme?: AuthUser["theme"] }) => Promise<void>;
+  updatePreferences: (prefs: {
+    theme?: AuthUser["theme"];
+    discoveryFilters?: DiscoveryFilters;
+  }) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 

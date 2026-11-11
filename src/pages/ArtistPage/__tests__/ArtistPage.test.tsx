@@ -13,8 +13,28 @@ let mockState: {
 let mockReleaseGroupsState: {
   releaseGroups: ReleaseGroup[];
   loading: boolean;
+  loadingMore: boolean;
+  ranking: boolean;
+  popularityUnavailable: boolean;
+  complete: boolean;
+  loaded: number;
+  total: number;
+  moreAvailable: boolean;
+  loadMore: ReturnType<typeof vi.fn>;
   error: string | null;
 };
+
+vi.mock("@/hooks/useDiscoveryFilters", () => ({
+  default: () => ({
+    filters: { excluded: [], sort: "popular" },
+    setFilters: vi.fn(),
+    save: vi.fn(),
+    changed: false,
+    saving: false,
+    error: null,
+  }),
+}));
+vi.mock("@/components/DiscoveryControls", () => ({ default: () => null }));
 
 vi.mock("@/hooks/useArtistDetails", () => ({
   default: () => mockState,
@@ -95,6 +115,14 @@ beforeEach(() => {
   mockReleaseGroupsState = {
     releaseGroups: [],
     loading: false,
+    loadingMore: false,
+    ranking: false,
+    popularityUnavailable: false,
+    complete: true,
+    loaded: 0,
+    total: 0,
+    moreAvailable: false,
+    loadMore: vi.fn(),
     error: null,
   };
   mockSimilar = { artists: [], loading: false };
@@ -116,7 +144,7 @@ describe("ArtistPage", () => {
     expect(screen.getByText("Artist not found")).toBeInTheDocument();
   });
 
-  it("renders sections with only the first one expanded", () => {
+  it("shows all release types in one expanded section", () => {
     mockState.artist = { mbid: "a1", name: "Radiohead", type: "Group" };
     mockReleaseGroupsState.releaseGroups = [
       makeRg({ id: "alb", title: "OK Computer", "primary-type": "Album" }),
@@ -127,13 +155,12 @@ describe("ArtistPage", () => {
     expect(
       screen.getByRole("heading", { name: "Radiohead" })
     ).toBeInTheDocument();
-    expect(screen.getByText("Albums")).toBeInTheDocument();
-    expect(screen.getByText("EPs")).toBeInTheDocument();
+    expect(screen.getByText("All releases")).toBeInTheDocument();
     expect(screen.getByText("OK Computer")).toBeInTheDocument();
-    expect(screen.queryByText("Drill EP")).not.toBeInTheDocument();
+    expect(screen.getByText("Drill EP")).toBeInTheDocument();
   });
 
-  it("shows a collapsed section's releases after expanding it", async () => {
+  it("can collapse and expand the all-releases section", async () => {
     const user = userEvent.setup();
     mockState.artist = { mbid: "a1", name: "Radiohead", type: "Group" };
     mockReleaseGroupsState.releaseGroups = [
@@ -142,8 +169,13 @@ describe("ArtistPage", () => {
     ];
     renderPage();
 
-    await user.click(screen.getByRole("button", { name: /EPs\s*\(1\)/ }));
-
+    await user.click(
+      screen.getByRole("button", { name: /All releases\s*\(2\)/ })
+    );
+    expect(screen.queryByText("Drill EP")).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: /All releases\s*\(2\)/ })
+    );
     expect(screen.getByText("Drill EP")).toBeInTheDocument();
   });
 
@@ -195,6 +227,7 @@ describe("ArtistPage", () => {
   it("renders the header while the discography is still loading", () => {
     mockState.artist = { mbid: "a1", name: "Radiohead" };
     mockReleaseGroupsState = {
+      ...mockReleaseGroupsState,
       releaseGroups: [],
       loading: true,
       error: null,
@@ -215,6 +248,7 @@ describe("ArtistPage", () => {
   it("keeps the rest of the page when the discography fails to load", () => {
     mockState.artist = { mbid: "a1", name: "Radiohead" };
     mockReleaseGroupsState = {
+      ...mockReleaseGroupsState,
       releaseGroups: [],
       loading: false,
       error: "Failed to load discography",

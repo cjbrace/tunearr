@@ -46,6 +46,9 @@ export class User {
   @Column({ type: "text", default: "system" })
   theme!: "light" | "dark" | "system";
 
+  @Column({ type: "text", default: '{"excluded":[],"sort":"popular"}' })
+  discovery_filters!: string;
+
   @Column({ type: "text", nullable: true })
   plex_username!: string | null;
 

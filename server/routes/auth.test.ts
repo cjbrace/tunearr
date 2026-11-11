@@ -460,6 +460,19 @@ describe("POST /auth/link-plex", () => {
 });
 
 describe("PATCH /auth/preferences", () => {
+  it("saves discovery filters across sessions", async () => {
+    const setup = await request(app)
+      .post("/auth/setup")
+      .send({ username: "admin", password: "password123" });
+    const cookie = setup.headers["set-cookie"][0];
+    const changed = await request(app)
+      .patch("/auth/preferences")
+      .set("Cookie", cookie)
+      .send({ discoveryFilters: { excluded: ["live"], sort: "popular" } });
+    expect(changed.status).toBe(200);
+    const me = await request(app).get("/auth/me").set("Cookie", cookie);
+    expect(me.body.user.discoveryFilters.excluded).toEqual(["live"]);
+  });
   it("returns 401 without authentication", async () => {
     const res = await request(app)
       .patch("/auth/preferences")
