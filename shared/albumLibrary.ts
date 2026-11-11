@@ -1,9 +1,9 @@
 /**
  * An album row existing in Lidarr only means it is monitored — it says nothing
  * about whether the files were ever found and downloaded. These helpers turn
- * Lidarr's track statistics into the three states the UI distinguishes.
+ * Lidarr's track statistics into the states the UI distinguishes.
  */
-export type AlbumLibraryState = "complete" | "partial" | "requested";
+export type AlbumLibraryState = "complete" | "partial" | "requested" | "local";
 
 export type AlbumLibraryInfo = {
   state: AlbumLibraryState;
@@ -30,6 +30,10 @@ export function deriveAlbumLibraryInfo(
 
 /** Short badge/pill text. */
 export function albumLibraryLabel(info: AlbumLibraryInfo): string {
+  if (info.state === "local")
+    return info.total > 0 && info.available < info.total
+      ? `${info.available}/${info.total} cached`
+      : "Locally available";
   if (info.state === "complete") return "In library";
   if (info.total === 0) return "Not downloaded";
   return `${info.available}/${info.total} tracks`;
@@ -37,6 +41,8 @@ export function albumLibraryLabel(info: AlbumLibraryInfo): string {
 
 /** Fuller phrasing for tooltips and screen readers. */
 export function albumLibraryTitle(info: AlbumLibraryInfo): string {
+  if (info.state === "local")
+    return `Cached locally while unmonitored — ${info.available}/${info.total} tracks`;
   if (info.state === "complete") return "In library";
   if (info.state === "partial")
     return `Partially downloaded — ${info.available}/${info.total} tracks`;

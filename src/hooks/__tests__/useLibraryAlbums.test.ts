@@ -21,7 +21,7 @@ describe("useLibraryAlbums", () => {
     const { result } = renderHook(() => useLibraryAlbums());
 
     await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith("/api/lidarr/albums");
+      expect(fetch).toHaveBeenCalledWith("/api/lidarr/albums/all");
     });
 
     expect(result.current.isAlbumInLibrary("some-mbid")).toBe(false);
@@ -116,6 +116,25 @@ describe("useLibraryAlbums", () => {
           total: 12,
         });
       });
+    });
+
+    it("shows a cached unmonitored album without treating it as playable", async () => {
+      const result = await renderWithAlbums([
+        {
+          id: 2,
+          foreignAlbumId: "rg-cached",
+          monitored: false,
+          statistics: { trackFileCount: 10, totalTrackCount: 10 },
+        },
+      ]);
+      await waitFor(() => {
+        expect(result.current.getAlbumLibrary("rg-cached")).toEqual({
+          state: "local",
+          available: 10,
+          total: 10,
+        });
+      });
+      expect(result.current.isAlbumInLibrary("rg-cached")).toBe(false);
     });
 
     it("reports partial when some tracks are missing", async () => {

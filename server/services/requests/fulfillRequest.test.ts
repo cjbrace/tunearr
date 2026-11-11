@@ -83,6 +83,31 @@ describe("fulfillRequest", () => {
     });
   });
 
+  it("monitors a complete cached album without searching again", async () => {
+    mockGetAlbumByMbid.mockResolvedValue({
+      title: "Cached Album",
+      artist: { foreignArtistId: "art-1", artistName: "Test Artist" },
+    });
+    mockGetOrAddArtist.mockResolvedValue({ id: 1 });
+    mockGetOrAddAlbum.mockResolvedValue({
+      wasAdded: false,
+      album: {
+        id: 10,
+        monitored: false,
+        statistics: { trackFileCount: 12, trackCount: 12 },
+      },
+    });
+    mockLidarrPut.mockResolvedValue({ ok: true });
+
+    const result = await fulfillRequest("mbid-1");
+    expect(result.status).toBe("success");
+    expect(mockLidarrPut).toHaveBeenCalledWith("/album/monitor", {
+      albumIds: [10],
+      monitored: true,
+    });
+    expect(mockLidarrPost).not.toHaveBeenCalled();
+  });
+
   it("searches when album is newly added", async () => {
     mockGetAlbumByMbid.mockResolvedValue({
       title: "Test Album",

@@ -21,6 +21,7 @@ export type LidarrArtist = {
 
 export type LidarrAlbumStatistics = {
   trackFileCount: number;
+  trackCount?: number;
   totalTrackCount: number;
   percentOfTracks: number;
 };

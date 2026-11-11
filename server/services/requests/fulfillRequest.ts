@@ -44,10 +44,20 @@ export async function fulfillRequest(
     }
   }
 
-  await lidarrPost("/command", {
-    name: "AlbumSearch",
-    albumIds: [album.id],
-  });
+  const stats = album.statistics;
+  const cachedComplete =
+    !wasAdded &&
+    (stats?.trackFileCount ?? 0) > 0 &&
+    (stats?.trackCount ?? stats?.totalTrackCount ?? 0) > 0 &&
+    (stats?.trackFileCount ?? 0) >=
+      (stats?.trackCount ?? stats?.totalTrackCount ?? 0);
+
+  if (!cachedComplete) {
+    await lidarrPost("/command", {
+      name: "AlbumSearch",
+      albumIds: [album.id],
+    });
+  }
 
   invalidateLidarrCaches();
   clearPromotedAlbumCache();

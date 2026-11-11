@@ -6,7 +6,11 @@ vi.mock("../../api/lidarr/get", () => ({
   lidarrGet: (...args: unknown[]) => mockLidarrGet(...args),
 }));
 
-import { getMonitoredAlbums, invalidateMonitoredAlbums } from "./albums";
+import {
+  getAllAlbums,
+  getMonitoredAlbums,
+  invalidateMonitoredAlbums,
+} from "./albums";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -14,6 +18,26 @@ beforeEach(() => {
 });
 
 describe("getMonitoredAlbums", () => {
+  it("keeps cached unmonitored albums available to the request UI", async () => {
+    mockLidarrGet.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [
+        { id: 1, monitored: true },
+        {
+          id: 2,
+          monitored: false,
+          statistics: { trackFileCount: 5, trackCount: 5 },
+        },
+      ],
+    });
+
+    const all = await getAllAlbums();
+    const monitored = await getMonitoredAlbums();
+    expect(all.ok && all.data).toHaveLength(2);
+    expect(monitored.ok && monitored.data).toHaveLength(1);
+    expect(mockLidarrGet).toHaveBeenCalledTimes(1);
+  });
   it("returns only monitored albums", async () => {
     mockLidarrGet.mockResolvedValue({
       ok: true,

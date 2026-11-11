@@ -7,7 +7,7 @@ type AlbumsResult =
   | { ok: false; error: string; status: number }
   | { ok: true; data: LidarrAlbum[] };
 
-async function loadMonitoredAlbums(): Promise<AlbumsResult> {
+async function loadAllAlbums(): Promise<AlbumsResult> {
   const result = await lidarrGet<LidarrAlbum[]>("/album");
 
   if (!result.ok) {
@@ -18,11 +18,11 @@ async function loadMonitoredAlbums(): Promise<AlbumsResult> {
     };
   }
 
-  return { ok: true, data: result.data.filter((album) => album.monitored) };
+  return { ok: true, data: result.data };
 }
 
 const snapshot = createSnapshotCache({
-  load: loadMonitoredAlbums,
+  load: loadAllAlbums,
   ttlMs: LIBRARY_SNAPSHOT_TTL_MS,
   shouldCache: (result: AlbumsResult) => result.ok,
 });
@@ -33,6 +33,17 @@ const snapshot = createSnapshotCache({
  * and the one the spotlight pays on every cold pick.
  */
 export function getMonitoredAlbums(): Promise<AlbumsResult> {
+  return snapshot
+    .get()
+    .then((result) =>
+      result.ok
+        ? { ok: true, data: result.data.filter((album) => album.monitored) }
+        : result
+    );
+}
+
+/** Include cached, unmonitored albums for request badges. */
+export function getAllAlbums(): Promise<AlbumsResult> {
   return snapshot.get();
 }
 

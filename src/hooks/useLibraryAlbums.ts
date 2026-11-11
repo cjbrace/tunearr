@@ -22,7 +22,7 @@ export default function useLibraryAlbums() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("/api/lidarr/albums");
+        const res = await fetch("/api/lidarr/albums/all");
         if (res.ok) {
           setLibraryAlbums(await res.json());
         }
@@ -39,11 +39,20 @@ export default function useLibraryAlbums() {
   );
 
   const isAlbumInLibrary = (albumMbid: string) =>
-    libraryAlbumsByMbid.has(albumMbid);
+    libraryAlbumsByMbid.get(albumMbid)?.monitored ?? false;
 
   const getAlbumLibrary = (albumMbid: string): AlbumLibraryInfo | null => {
     const album = libraryAlbumsByMbid.get(albumMbid);
     if (!album) return null;
+    if (!album.monitored) {
+      const available = album.statistics?.trackFileCount ?? 0;
+      if (available === 0) return null;
+      return {
+        state: "local",
+        available,
+        total: album.statistics?.totalTrackCount ?? 0,
+      };
+    }
     return deriveAlbumLibraryInfo(album.statistics);
   };
 

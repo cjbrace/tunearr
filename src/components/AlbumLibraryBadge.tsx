@@ -21,12 +21,14 @@ const CIRCLE_CLASSES: Record<AlbumLibraryState, string> = {
   complete: "bg-amber-300 text-black",
   partial: "bg-amber-300 text-black",
   requested: "bg-gray-200 dark:bg-gray-500 text-black dark:text-white",
+  local: "bg-sky-200 text-black",
 };
 
 const PILL_CLASSES: Record<AlbumLibraryState, string> = {
   complete: "bg-amber-300 text-black",
   partial: "bg-amber-300 text-black",
   requested: "bg-gray-200 dark:bg-gray-500 text-black dark:text-white",
+  local: "bg-sky-200 text-black",
 };
 
 /** Circular badge overlaid on album cover art. */
