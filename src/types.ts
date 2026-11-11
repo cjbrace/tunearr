@@ -9,6 +9,7 @@ export interface ReleaseGroup {
     artist: { id: string; name: string };
   }>;
   "secondary-types"?: string[];
+  popularity?: { listeners: number; listens: number };
 }
 
 export interface ArtistDetails {

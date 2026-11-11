@@ -12,6 +12,7 @@ export type MusicBrainzReleaseGroup = {
     };
   }>;
   "secondary-types"?: string[];
+  popularity?: { listeners: number; listens: number };
 };
 
 export type MusicBrainzSearchResponse = {

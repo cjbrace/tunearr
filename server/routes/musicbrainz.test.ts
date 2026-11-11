@@ -15,6 +15,7 @@ const mockSearchArtists = vi.fn();
 const mockGetArtistMbidByName = vi.fn();
 const mockGetArtistImage = vi.fn();
 const mockGetArtistsImages = vi.fn();
+const mockGetReleaseGroupPopularity = vi.fn();
 
 vi.mock("../api/musicbrainz/releaseGroups", () => ({
   searchReleaseGroups: (...args: unknown[]) => mockSearchReleaseGroups(...args),
@@ -35,6 +36,11 @@ vi.mock("../api/musicbrainz/artists", () => ({
 vi.mock("../api/deezer/artists", () => ({
   getArtistImage: (...args: unknown[]) => mockGetArtistImage(...args),
   getArtistsImages: (...args: unknown[]) => mockGetArtistsImages(...args),
+}));
+
+vi.mock("../api/listenbrainz/popularity", () => ({
+  getReleaseGroupPopularity: (...args: unknown[]) =>
+    mockGetReleaseGroupPopularity(...args),
 }));
 
 vi.mock("../config", () => ({
@@ -68,6 +74,7 @@ app.use("/", musicbrainzRouter);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetReleaseGroupPopularity.mockResolvedValue(new Map());
 });
 
 describe("GET /search", () => {
@@ -79,11 +86,15 @@ describe("GET /search", () => {
 
   it("searches release groups by query", async () => {
     const data = [{ id: "rg-2", title: "Kid A" }];
-    mockSearchReleaseGroups.mockResolvedValue(data);
+    mockSearchReleaseGroups.mockResolvedValue({
+      "release-groups": data,
+      count: 1,
+      offset: 0,
+    });
 
     const res = await request(app).get("/search?q=Kid+A");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(data);
+    expect(res.body).toEqual({ "release-groups": data, count: 1, offset: 0 });
     expect(mockSearchReleaseGroups).toHaveBeenCalledWith("Kid A");
   });
 });
@@ -132,6 +143,26 @@ describe("GET /search/all", () => {
       "Radiohead",
       "Radio Dept.",
     ]);
+  });
+
+  it("adds listener counts to search results when available", async () => {
+    mockSearchReleaseGroups.mockResolvedValue({
+      "release-groups": [{ id: "rg-1", title: "Inception" }],
+      count: 1,
+      offset: 0,
+    });
+    mockSearchArtists.mockResolvedValue([]);
+    mockGetArtistsImages.mockResolvedValue(new Map());
+    mockGetReleaseGroupPopularity.mockResolvedValue(
+      new Map([["rg-1", { listeners: 7429, listens: 183093 }]])
+    );
+
+    const res = await request(app).get("/search/all?q=inception");
+    expect(res.status).toBe(200);
+    expect(res.body["release-groups"][0].popularity).toEqual({
+      listeners: 7429,
+      listens: 183093,
+    });
   });
 
   it("caps low-scoring artists out of the results", async () => {

@@ -64,6 +64,17 @@ describe("ReleaseGroupCard", () => {
     expect(screen.getAllByText("2023").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("shows the ListenBrainz listener count when it is available", () => {
+    render(
+      <ReleaseGroupCard
+        releaseGroup={makeReleaseGroup({
+          popularity: { listeners: 7429, listens: 183093 },
+        })}
+      />
+    );
+    expect(screen.getAllByText("7,429 listeners")).toHaveLength(2);
+  });
+
   it("shows 'Unknown Artist' when artist-credit is empty", () => {
     render(
       <ReleaseGroupCard

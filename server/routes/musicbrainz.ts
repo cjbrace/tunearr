@@ -16,6 +16,8 @@ import {
 import { getArtistImage, getArtistsImages } from "../api/deezer/artists";
 import type { ArtistInfo } from "../api/musicbrainz/types";
 import { getLabelAncestors } from "../api/musicbrainz/labels";
+import { getReleaseGroupPopularity } from "../api/listenbrainz/popularity";
+import type { MusicBrainzReleaseGroup } from "../api/musicbrainz/types";
 import { getReleaseTracks } from "../api/musicbrainz/tracks";
 import { enrichTracksWithPreviews } from "../services/musicbrainz";
 import { getConfigValue } from "../config";
@@ -42,6 +44,16 @@ async function enrichArtistsWithImages(artists: ArtistInfo[]) {
   }));
 }
 
+async function withPopularity(releaseGroups: MusicBrainzReleaseGroup[]) {
+  const popularity = await getReleaseGroupPopularity(
+    releaseGroups.map((rg) => rg.id)
+  );
+  return releaseGroups.map((rg) => {
+    const value = popularity.get(rg.id);
+    return value ? { ...rg, popularity: value } : rg;
+  });
+}
+
 router.get("/search/all", async (req: Request, res: Response) => {
   const { q } = req.query;
   if (typeof q !== "string") {
@@ -53,10 +65,13 @@ router.get("/search/all", async (req: Request, res: Response) => {
     searchArtists(q),
   ]);
 
-  const enrichedArtists = await enrichArtistsWithImages(topArtists(artists));
+  const [enrichedArtists, albums] = await Promise.all([
+    enrichArtistsWithImages(topArtists(artists)),
+    withPopularity(releaseGroups["release-groups"]),
+  ]);
 
   res.json({
-    "release-groups": releaseGroups["release-groups"],
+    "release-groups": albums,
     count: releaseGroups.count,
     artists: enrichedArtists,
   });
@@ -68,7 +83,11 @@ router.get("/search", async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Query parameter q is required" });
   }
 
-  res.json(await searchReleaseGroups(q));
+  const found = await searchReleaseGroups(q);
+  res.json({
+    ...found,
+    "release-groups": await withPopularity(found["release-groups"]),
+  });
 });
 
 router.get("/artist/search", async (req: Request, res: Response) => {
@@ -95,7 +114,7 @@ router.get(
   async (req: Request, res: Response) => {
     const { mbid } = req.params;
     const releaseGroups = await fetchReleaseGroupsForArtist(mbid as string);
-    res.json({ releaseGroups });
+    res.json({ releaseGroups: await withPopularity(releaseGroups) });
   }
 );
 

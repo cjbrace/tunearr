@@ -28,6 +28,7 @@ export default function ReleaseGroupCard({
   const albumTitle = releaseGroup.title || "";
   const albumMbid = releaseGroup.id;
   const year = releaseGroup["first-release-date"]?.slice(0, 4) || "";
+  const listeners = releaseGroup.popularity?.listeners;
   const pastelBg = useMemo(() => pastelColorFromId(albumMbid), [albumMbid]);
   const coverUrl = `https://coverartarchive.org/release-group/${albumMbid}/front-500`;
 
@@ -82,6 +83,14 @@ export default function ReleaseGroupCard({
           {year && (
             <p className="text-gray-400 dark:text-gray-500 text-xs">{year}</p>
           )}
+          {listeners != null && (
+            <p
+              className="text-gray-400 dark:text-gray-500 text-xs"
+              title="Unique ListenBrainz listeners"
+            >
+              {listeners.toLocaleString()} listeners
+            </p>
+          )}
         </div>
       </button>
 
@@ -108,6 +117,14 @@ export default function ReleaseGroupCard({
           {year && (
             <p className="text-gray-400 dark:text-gray-500 text-xs mt-0.5">
               {year}
+            </p>
+          )}
+          {listeners != null && (
+            <p
+              className="text-gray-400 dark:text-gray-500 text-xs mt-0.5"
+              title="Unique ListenBrainz listeners"
+            >
+              {listeners.toLocaleString()} listeners
             </p>
           )}
         </div>

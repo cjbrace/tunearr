@@ -144,6 +144,23 @@ describe("SearchPage", () => {
     expect(screen.getAllByTestId("release-card")).toHaveLength(2);
   });
 
+  it("ranks popular search matches before obscure matches", () => {
+    mockSearchState.albums = [
+      {
+        ...makeAlbum("obscure", "Inception", 100),
+        popularity: { listeners: 10, listens: 20 },
+      },
+      {
+        ...makeAlbum("popular", "Inception: Music From the Motion Picture", 65),
+        popularity: { listeners: 7429, listens: 183093 },
+      },
+    ];
+    renderSearchPage("Inception");
+    expect(
+      screen.getAllByTestId("release-card").map((card) => card.textContent)
+    ).toEqual(["Inception: Music From the Motion Picture", "Inception"]);
+  });
+
   it("orders the artist section before the album section", () => {
     mockSearchState.artists = [{ mbid: "a1", name: "Radiohead" }];
     mockSearchState.albums = [makeAlbum("rg-1", "OK Computer")];

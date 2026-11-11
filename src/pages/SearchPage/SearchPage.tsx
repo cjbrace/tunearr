@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import SearchBar from "./components/SearchBar";
 import ReleaseGroupCard from "@/components/ReleaseGroupCard";
@@ -7,6 +7,7 @@ import Skeleton from "@/components/Skeleton";
 import useSearch from "@/hooks/useSearch";
 import useLibraryAlbums from "@/hooks/useLibraryAlbums";
 import useLibraryArtists from "@/hooks/useLibraryArtists";
+import { compareSearchReleases } from "@/utils/releasePopularity";
 
 const DEAL_ROTATIONS = [-4, 3.5, -3, 4.5, -3.5, 3];
 
@@ -94,10 +95,14 @@ export default function SearchPage() {
   );
 
   const hasResults = artists.length > 0 || albums.length > 0;
-  const soundtracks = albums.filter((rg) =>
+  const rankedAlbums = useMemo(
+    () => [...albums].sort(compareSearchReleases),
+    [albums]
+  );
+  const soundtracks = rankedAlbums.filter((rg) =>
     rg["secondary-types"]?.some((type) => type.toLowerCase() === "soundtrack")
   );
-  const otherAlbums = albums.filter(
+  const otherAlbums = rankedAlbums.filter(
     (rg) =>
       !rg["secondary-types"]?.some(
         (type) => type.toLowerCase() === "soundtrack"
@@ -162,6 +167,11 @@ export default function SearchPage() {
             </section>
           )}
 
+          {albums.some((rg) => rg.popularity) && (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Albums are ranked by title match and ListenBrainz listeners.
+            </p>
+          )}
           {soundtracks.length > 0 && albumSection("Soundtracks", soundtracks)}
           {otherAlbums.length > 0 && albumSection("Albums", otherAlbums)}
         </div>

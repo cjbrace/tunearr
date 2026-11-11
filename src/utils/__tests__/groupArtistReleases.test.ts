@@ -45,6 +45,23 @@ describe("groupArtistReleases", () => {
     expect(sections.find((s) => s.title === "Albums")!.items).toHaveLength(1);
   });
 
+  it("separates soundtracks and ranks each section by listeners", () => {
+    const sections = groupArtistReleases(
+      [
+        make({ id: "obscure", popularity: { listeners: 2, listens: 20 } }),
+        make({ id: "popular", popularity: { listeners: 800, listens: 1000 } }),
+        make({ id: "score", "secondary-types": ["Soundtrack"] }),
+      ],
+      ARTIST
+    );
+    expect(sections.map((s) => s.title)).toEqual(["Albums", "Soundtracks"]);
+    expect(sections[0].items.map((item) => item.id)).toEqual([
+      "popular",
+      "obscure",
+    ]);
+    expect(sections[1].items[0].id).toBe("score");
+  });
+
   it("separates releases where the artist is not the primary credit into Featured", () => {
     const sections = groupArtistReleases(
       [

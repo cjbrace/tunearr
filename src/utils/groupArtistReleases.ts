@@ -1,14 +1,17 @@
 import type { ReleaseGroup } from "@/types";
+import { compareArtistReleases } from "./releasePopularity";
 
 export interface ReleaseSection {
   title: string;
   items: ReleaseGroup[];
 }
 
-type BucketKey = "albums" | "eps" | "singles" | "compilations" | "other";
+type BucketKey =
+  "albums" | "soundtracks" | "eps" | "singles" | "compilations" | "other";
 
 const SECTION_ORDER: { key: BucketKey; title: string }[] = [
   { key: "albums", title: "Albums" },
+  { key: "soundtracks", title: "Soundtracks" },
   { key: "eps", title: "EPs" },
   { key: "singles", title: "Singles" },
   { key: "compilations", title: "Compilations & Live" },
@@ -18,7 +21,6 @@ const SECTION_ORDER: { key: BucketKey; title: string }[] = [
 const SECONDARY_BUCKET = new Set([
   "compilation",
   "live",
-  "soundtrack",
   "remix",
   "dj-mix",
   "mixtape/street",
@@ -44,15 +46,6 @@ function primaryBucket(rg: ReleaseGroup): BucketKey {
   }
 }
 
-function byDateDesc(a: ReleaseGroup, b: ReleaseGroup): number {
-  const dateA = a["first-release-date"] || "";
-  const dateB = b["first-release-date"] || "";
-  if (dateA && dateB) return dateB.localeCompare(dateA);
-  if (dateA) return -1;
-  if (dateB) return 1;
-  return b.score - a.score;
-}
-
 /**
  * Organize an artist's release groups into MusicBrainz-style sections.
  * Releases where the artist isn't the primary credit are grouped under
@@ -66,6 +59,7 @@ export function groupArtistReleases(
 ): ReleaseSection[] {
   const buckets: Record<BucketKey, ReleaseGroup[]> = {
     albums: [],
+    soundtracks: [],
     eps: [],
     singles: [],
     compilations: [],
@@ -79,20 +73,27 @@ export function groupArtistReleases(
       featured.push(rg);
       continue;
     }
-    const key = hasBucketedSecondaryType(rg)
-      ? "compilations"
-      : primaryBucket(rg);
+    const key = rg["secondary-types"]?.some(
+      (type) => type.toLowerCase() === "soundtrack"
+    )
+      ? "soundtracks"
+      : hasBucketedSecondaryType(rg)
+        ? "compilations"
+        : primaryBucket(rg);
     buckets[key].push(rg);
   }
 
   const sections: ReleaseSection[] = [];
   for (const { key, title } of SECTION_ORDER) {
     if (buckets[key].length > 0) {
-      sections.push({ title, items: buckets[key].sort(byDateDesc) });
+      sections.push({ title, items: buckets[key].sort(compareArtistReleases) });
     }
   }
   if (featured.length > 0) {
-    sections.push({ title: "Featured", items: featured.sort(byDateDesc) });
+    sections.push({
+      title: "Featured",
+      items: featured.sort(compareArtistReleases),
+    });
   }
 
   return sections;

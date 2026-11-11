@@ -44,6 +44,13 @@ export default function ArtistDiscography({
 
   return (
     <>
+      {sections.some((section) =>
+        section.items.some((item) => item.popularity)
+      ) && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Albums are sorted by ListenBrainz listeners.
+        </p>
+      )}
       {sections.map((section, index) => (
         <ReleaseSectionGrid
           key={section.title}
