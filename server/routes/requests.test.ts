@@ -187,6 +187,28 @@ describe("GET /", () => {
     expect(res.body[0].lidarr).toBeNull();
   });
 
+  it("shows a stored failed status when the old request has no Lidarr album", async () => {
+    mockGetRequests.mockResolvedValue([
+      {
+        id: 2,
+        album_mbid: "mbid-old",
+        artist_name: "Artist",
+        album_title: "Old request",
+        status: "approved",
+        lidarr_status: "failed",
+        created_at: "2024-01-01",
+        updated_at: "2024-01-01",
+        approved_at: "2024-01-01",
+        user: null,
+      },
+    ]);
+    mockEnrichRequestsWithLidarr.mockResolvedValue([null]);
+
+    const res = await request(app).get("/");
+    expect(res.status).toBe(200);
+    expect(res.body[0].lidarr.status).toBe("failed");
+  });
+
   it("does not attach a lidarr lifecycle to non-approved requests", async () => {
     mockGetRequests.mockResolvedValue([
       {

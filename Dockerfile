@@ -27,7 +27,7 @@ ENV APP_CONFIG_DIR=/config
 ENV NODE_ENV=production
 ENV PORT=3001
 
-RUN mkdir -p /config && chown node:node /config && chown -R node:node /app
+RUN mkdir -p /config && chown node:node /config
 
 EXPOSE 3001
 USER node

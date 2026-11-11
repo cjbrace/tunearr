@@ -78,7 +78,24 @@ router.get("/", async (req: Request, res: Response) => {
           thumb: r.user.plex_thumb,
         }
       : null,
-    lidarr: r.status === "approved" ? (lifecycles[i] ?? null) : null,
+    lidarr:
+      r.status !== "approved"
+        ? null
+        : lifecycles[i]
+          ? {
+              ...lifecycles[i],
+              status: lifecycles[i].status ?? r.lidarr_status ?? null,
+            }
+          : r.lidarr_status
+            ? {
+                status: r.lidarr_status,
+                downloadProgress: null,
+                quality: null,
+                sourceIndexer: null,
+                lastEvent: null,
+                lidarrAlbumId: null,
+              }
+            : null,
   }));
 
   res.json(sanitized);
