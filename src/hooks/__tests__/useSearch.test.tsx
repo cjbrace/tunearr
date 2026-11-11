@@ -27,6 +27,63 @@ beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 afterEach(() => vi.unstubAllGlobals());
 
 describe("useSearch", () => {
+  it("publishes artist matches while the album page is pending", async () => {
+    let finishAlbum!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementation((input) =>
+      String(input).includes("search/artists")
+        ? Promise.resolve(
+            new Response(
+              JSON.stringify({
+                artists: [{ mbid: "hans", name: "Hans Zimmer" }],
+              })
+            )
+          )
+        : new Promise((resolve) => {
+            finishAlbum = resolve;
+          })
+    );
+    const { result } = renderHook(() => useSearch(), { wrapper });
+    act(() => result.current.search("Hans Zimmer"));
+    await waitFor(() =>
+      expect(result.current.artists[0]?.name).toBe("Hans Zimmer")
+    );
+    expect(result.current.albumLoading).toBe(true);
+    act(() =>
+      finishAlbum(
+        new Response(
+          JSON.stringify({ "release-groups": [], count: 0, offset: 0 })
+        )
+      )
+    );
+    await waitFor(() => expect(result.current.complete).toBe(true));
+  });
+
+  it("stops automatic pages at 200 results", async () => {
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("search/artists"))
+        return Promise.resolve(new Response(JSON.stringify({ artists: [] })));
+      const offset = url.includes("offset=100") ? 100 : 0;
+      const releases = Array.from({ length: 100 }, (_, i) => ({
+        id: String(offset + i),
+        title: String(i),
+      }));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({ "release-groups": releases, count: 500, offset })
+        )
+      );
+    });
+    const { result } = renderHook(() => useSearch(), { wrapper });
+    act(() => result.current.search("Hans Zimmer"));
+    await waitFor(() => expect(result.current.loaded).toBe(200));
+    expect(result.current.moreAvailable).toBe(true);
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(([url]) => String(url).includes("offset=200"))
+    ).toBe(false);
+  });
   it("does not fetch an empty query", () => {
     const { result } = renderHook(() => useSearch(), { wrapper });
     expect(result.current.albums).toEqual([]);

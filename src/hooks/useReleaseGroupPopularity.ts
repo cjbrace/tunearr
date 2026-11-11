@@ -4,11 +4,14 @@ import type { ReleaseGroup } from "@/types";
 
 type Popularity = Record<string, { listeners: number; listens: number }>;
 
-export default function useReleaseGroupPopularity(releases: ReleaseGroup[]) {
+export default function useReleaseGroupPopularity(
+  releases: ReleaseGroup[],
+  enabled = true
+) {
   const ids = useMemo(() => releases.map((release) => release.id), [releases]);
   const query = useQuery({
     queryKey: ["release-popularity", ids],
-    enabled: ids.length > 0,
+    enabled: enabled && ids.length > 0,
     staleTime: 24 * 60 * 60 * 1000,
     retry: false,
     queryFn: async ({ signal }) => {

@@ -6,7 +6,8 @@ import type { ArtistSearchResult, ReleaseGroup } from "@/types";
 let mockSearchState: {
   albums: ReleaseGroup[];
   artists: ArtistSearchResult[];
-  loading: boolean;
+  albumLoading: boolean;
+  artistLoading: boolean;
   loadingMore: boolean;
   ranking: boolean;
   popularityUnavailable: boolean;
@@ -15,7 +16,10 @@ let mockSearchState: {
   total: number;
   moreAvailable: boolean;
   loadMore: ReturnType<typeof vi.fn>;
-  error: string | null;
+  albumError: string | null;
+  artistError: string | null;
+  retryAlbums: ReturnType<typeof vi.fn>;
+  retryArtists: ReturnType<typeof vi.fn>;
   search: ReturnType<typeof vi.fn>;
 };
 
@@ -109,7 +113,8 @@ beforeEach(() => {
   mockSearchState = {
     albums: [],
     artists: [],
-    loading: false,
+    albumLoading: false,
+    artistLoading: false,
     loadingMore: false,
     ranking: false,
     popularityUnavailable: false,
@@ -118,7 +123,10 @@ beforeEach(() => {
     total: 0,
     moreAvailable: false,
     loadMore: vi.fn(),
-    error: null,
+    albumError: null,
+    artistError: null,
+    retryAlbums: vi.fn(),
+    retryArtists: vi.fn(),
     search: vi.fn(),
   };
   libraryAlbumMbids = [];
@@ -126,6 +134,26 @@ beforeEach(() => {
 });
 
 describe("SearchPage", () => {
+  it("shows an artist immediately while album lookup is still pending", () => {
+    mockSearchState.artists = [{ mbid: "hans", name: "Hans Zimmer" }];
+    mockSearchState.albumLoading = true;
+    mockSearchState.complete = false;
+    renderSearchPage("Hans Zimmer");
+    expect(screen.getByText("Hans Zimmer")).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading albums")).toBeInTheDocument();
+  });
+
+  it("limits initial album cards and reveals more on demand", () => {
+    mockSearchState.albums = Array.from({ length: 45 }, (_, i) =>
+      makeAlbum(String(i), `Album ${i}`)
+    );
+    renderSearchPage("albums");
+    expect(screen.getAllByTestId("release-card")).toHaveLength(40);
+    act(() =>
+      screen.getByRole("button", { name: "Show more matches" }).click()
+    );
+    expect(screen.getAllByTestId("release-card")).toHaveLength(45);
+  });
   it("renders a single Search heading", () => {
     renderSearchPage();
     expect(

@@ -24,12 +24,77 @@ import { getReleaseTracks } from "../api/musicbrainz/tracks";
 import { enrichTracksWithPreviews } from "../services/musicbrainz";
 import { getConfigValue } from "../config";
 import { evaluatePurchaseDecision } from "../services/purchaseDecision/evaluatePurchaseDecision";
+import { lidarrGet } from "../api/lidarr/get";
 
 const router = express.Router();
 
 const ARTIST_SCORE_THRESHOLD = 85;
 const ARTIST_RESULT_LIMIT = 5;
 const PAGE_SIZE = 100;
+
+type LookupArtist = {
+  artistName?: string;
+  foreignArtistId?: string;
+  artistType?: string;
+  disambiguation?: string;
+  remotePoster?: string;
+};
+
+function lidarrArtistMatches(
+  artists: LookupArtist[],
+  query: string
+): ArtistInfo[] {
+  const needle = query.trim().toLocaleLowerCase();
+  return artists
+    .map((artist) => {
+      const name = artist.artistName?.trim() ?? "";
+      const normalized = name.toLocaleLowerCase();
+      const score =
+        normalized === needle
+          ? 100
+          : normalized.startsWith(needle)
+            ? 95
+            : normalized.includes(needle)
+              ? 90
+              : 0;
+      return { artist, name, score };
+    })
+    .filter(
+      ({ artist, score }) =>
+        score >= ARTIST_SCORE_THRESHOLD && !!artist.foreignArtistId
+    )
+    .sort((a, b) => b.score - a.score)
+    .slice(0, ARTIST_RESULT_LIMIT)
+    .map(({ artist, name, score }) => ({
+      mbid: artist.foreignArtistId!,
+      name,
+      score,
+      type: artist.artistType || undefined,
+      disambiguation: artist.disambiguation || undefined,
+      imageUrl: artist.remotePoster || undefined,
+    }));
+}
+
+async function quickArtistMatches(query: string): Promise<ArtistInfo[]> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      lidarrGet<LookupArtist[]>("/artist/lookup", { term: query }),
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), 2500);
+      }),
+    ]);
+    if (result?.ok && Array.isArray(result.data)) {
+      const matched = lidarrArtistMatches(result.data, query);
+      if (matched.length > 0) return matched;
+    }
+  } catch {
+    // MusicBrainz remains available when Lidarr's metadata lookup fails.
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+  return topArtists(await searchArtists(query));
+}
 
 function pageOffset(value: unknown): number | null {
   const offset = Number(value ?? 0);
@@ -117,8 +182,7 @@ router.get("/search/artists", async (req: Request, res: Response) => {
   if (typeof q !== "string" || !q.trim()) {
     return res.status(400).json({ error: "Query parameter q is required" });
   }
-  const artists = topArtists(await searchArtists(q.trim()));
-  res.json({ artists: await enrichArtistsWithImages(artists) });
+  res.json({ artists: await quickArtistMatches(q.trim()) });
 });
 
 router.post("/popularity", async (req: Request, res: Response) => {

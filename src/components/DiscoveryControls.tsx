@@ -1,4 +1,6 @@
+import { useState } from "react";
 import FilterBar from "./FilterBar";
+import FilterDropdown from "./FilterBar/FilterDropdown";
 import {
   RELEASE_KINDS,
   type DiscoveryFilters,
@@ -23,41 +25,31 @@ export default function DiscoveryControls({
   saving,
   error,
 }: Props) {
+  const [sortOpen, setSortOpen] = useState(false);
+
   return (
-    <div className="mb-5 space-y-2" aria-label="Release filters">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-          All releases
-        </h2>
-        <label className="text-sm text-gray-600 dark:text-gray-300">
-          Sort{" "}
-          <select
-            aria-label="Sort releases"
-            value={filters.sort}
-            onChange={(event) =>
-              onChange({
-                ...filters,
-                sort: event.target.value as DiscoveryFilters["sort"],
-              })
-            }
-            className="rounded border border-gray-400 bg-white px-2 py-1 text-gray-900 dark:bg-gray-800 dark:text-white"
-          >
-            <option value="popular">Most listened</option>
-            <option value="newest">Newest</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={!changed || saving}
-          className="rounded-lg border-2 border-black bg-amber-300 px-3 py-1 text-sm font-semibold disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save filters"}
-        </button>
-        <span className="text-xs text-gray-500" role="status">
-          {error ?? (changed ? "Unsaved changes" : "Saved for your account")}
-        </span>
-      </div>
+    <div
+      className="my-5 flex flex-wrap items-center gap-3"
+      aria-label="Release filters"
+    >
+      <FilterDropdown
+        group={{
+          key: "sort",
+          label: "Sort",
+          options: [
+            { value: "popular", label: "Most listened" },
+            { value: "newest", label: "Newest" },
+          ],
+        }}
+        selected={[filters.sort]}
+        singleSelect
+        isOpen={sortOpen}
+        onToggleOpen={() => setSortOpen((open) => !open)}
+        onChange={(values) => {
+          onChange({ ...filters, sort: values[0] as DiscoveryFilters["sort"] });
+          setSortOpen(false);
+        }}
+      />
       <FilterBar
         filters={[
           {
@@ -79,6 +71,22 @@ export default function DiscoveryControls({
           })
         }
       />
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={!changed || saving}
+        className="rounded-lg border-2 border-black bg-pink-400 px-3 py-1.5 text-sm font-bold text-black shadow-cartoon-sm transition-all hover:-translate-y-px hover:bg-pink-300 hover:shadow-cartoon-md active:translate-y-px active:shadow-cartoon-pressed disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-cartoon-sm"
+      >
+        {saving ? "Saving..." : "Save filters"}
+      </button>
+      {(changed || error) && (
+        <span
+          className={`text-xs font-medium ${error ? "text-rose-400" : "text-gray-500 dark:text-gray-400"}`}
+          role="status"
+        >
+          {error ?? "Unsaved changes"}
+        </span>
+      )}
     </div>
   );
 }

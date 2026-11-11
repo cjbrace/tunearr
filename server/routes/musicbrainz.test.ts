@@ -18,6 +18,11 @@ const mockGetArtistMbidByName = vi.fn();
 const mockGetArtistImage = vi.fn();
 const mockGetArtistsImages = vi.fn();
 const mockGetReleaseGroupPopularity = vi.fn();
+const mockLidarrGet = vi.fn();
+
+vi.mock("../api/lidarr/get", () => ({
+  lidarrGet: (...args: unknown[]) => mockLidarrGet(...args),
+}));
 
 vi.mock("../api/musicbrainz/releaseGroups", () => ({
   searchReleaseGroups: (...args: unknown[]) => mockSearchReleaseGroups(...args),
@@ -81,9 +86,35 @@ app.use("/", musicbrainzRouter);
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetReleaseGroupPopularity.mockResolvedValue(new Map());
+  mockLidarrGet.mockResolvedValue({ ok: false, status: 503, data: [] });
 });
 
 describe("paged discovery", () => {
+  it("returns exact artist results from Lidarr without waiting for MusicBrainz or images", async () => {
+    mockLidarrGet.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [
+        { artistName: "Hans Zimmergren", foreignArtistId: "other" },
+        {
+          artistName: "Hans Zimmer",
+          foreignArtistId: "hans",
+          remotePoster: "https://img/hans.jpg",
+        },
+        { artistName: "Unrelated", foreignArtistId: "unrelated" },
+      ],
+    });
+    const res = await request(app).get("/search/artists?q=Hans+Zimmer");
+    expect(res.status).toBe(200);
+    expect(
+      res.body.artists.map((artist: { name: string }) => artist.name)
+    ).toEqual(["Hans Zimmer", "Hans Zimmergren"]);
+    expect(mockLidarrGet).toHaveBeenCalledWith("/artist/lookup", {
+      term: "Hans Zimmer",
+    });
+    expect(mockSearchArtists).not.toHaveBeenCalled();
+    expect(mockGetArtistsImages).not.toHaveBeenCalled();
+  });
   it("returns one search page without loading the full catalog", async () => {
     const page = { "release-groups": [{ id: "one" }], count: 205, offset: 0 };
     mockSearchReleaseGroupsPage.mockResolvedValue(page);

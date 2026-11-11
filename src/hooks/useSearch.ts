@@ -9,12 +9,15 @@ type SearchPage = {
   offset: number;
 };
 
+const AUTO_SEARCH_RESULTS = 200;
+
 export default function useSearch() {
   const [query, setQuery] = useState("");
   const pages = useInfiniteQuery({
     queryKey: ["album-search", query],
     enabled: !!query,
     initialPageParam: 0,
+    retry: false,
     queryFn: async ({ pageParam, signal }): Promise<SearchPage> => {
       const params = new URLSearchParams({
         q: query,
@@ -32,6 +35,7 @@ export default function useSearch() {
   const artists = useQuery({
     queryKey: ["artist-search", query],
     enabled: !!query,
+    retry: false,
     queryFn: async ({ signal }): Promise<ArtistSearchResult[]> => {
       const params = new URLSearchParams({ q: query });
       const response = await fetch(
@@ -47,32 +51,48 @@ export default function useSearch() {
     () => pages.data?.pages.flatMap((page) => page["release-groups"]) ?? [],
     [pages.data]
   );
-  const popularity = useReleaseGroupPopularity(rawAlbums);
   const loaded = rawAlbums.length;
   const total = pages.data?.pages[0]?.count ?? 0;
   const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = pages;
+  const popularity = useReleaseGroupPopularity(
+    rawAlbums,
+    loaded > 0 && (loaded >= AUTO_SEARCH_RESULTS || !hasNextPage || isError)
+  );
   useEffect(() => {
-    if (hasNextPage && !isFetchingNextPage && !isError && loaded < 500)
+    if (
+      hasNextPage &&
+      !isFetchingNextPage &&
+      !isError &&
+      loaded < AUTO_SEARCH_RESULTS
+    )
       void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, isError, fetchNextPage, loaded]);
   const search = useCallback((value: string) => setQuery(value.trim()), []);
   return {
     albums: popularity.releases,
     artists: artists.data ?? [],
-    loading: !!query && pages.isPending,
+    loading: !!query && pages.isPending && artists.isPending,
+    albumLoading: !!query && pages.isPending,
+    artistLoading: !!query && artists.isPending,
     loadingMore: isFetchingNextPage,
     ranking: popularity.loading,
     popularityUnavailable: popularity.unavailable,
     complete:
       !!query &&
       !hasNextPage &&
+      !isError &&
+      !artists.isError &&
       !pages.isFetching &&
       !artists.isFetching &&
       !popularity.loading,
     loaded,
     total,
-    moreAvailable: !!hasNextPage && loaded >= 500,
+    moreAvailable: !!hasNextPage && loaded >= AUTO_SEARCH_RESULTS,
     loadMore: fetchNextPage,
+    retryAlbums: pages.refetch,
+    retryArtists: artists.refetch,
+    albumError: pages.error?.message ?? null,
+    artistError: artists.error?.message ?? null,
     error: pages.error?.message ?? artists.error?.message ?? null,
     search,
   };

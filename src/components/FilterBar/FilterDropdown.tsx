@@ -30,10 +30,12 @@ function handleClickOutside(
 function DropdownOption({
   label,
   selected,
+  singleSelect,
   onToggle,
 }: {
   label: string;
   selected: boolean;
+  singleSelect: boolean;
   onToggle: () => void;
 }) {
   return (
@@ -45,13 +47,18 @@ function DropdownOption({
       className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
     >
       <span
-        className={`flex items-center justify-center w-4.5 h-4.5 rounded border-2 flex-shrink-0 transition-colors ${
+        className={`flex items-center justify-center w-4.5 h-4.5 ${singleSelect ? "rounded-full" : "rounded"} border-2 flex-shrink-0 transition-colors ${
           selected
             ? "bg-gray-900 dark:bg-gray-100 border-gray-900 dark:border-gray-100 text-white dark:text-gray-900"
             : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800"
         }`}
       >
-        {selected && <CheckIcon className="w-3.5 h-3.5" />}
+        {selected &&
+          (singleSelect ? (
+            <span className="h-1.5 w-1.5 rounded-full bg-white dark:bg-gray-900" />
+          ) : (
+            <CheckIcon className="w-3.5 h-3.5" />
+          ))}
       </span>
       <span className="text-gray-900 dark:text-gray-100">{label}</span>
     </button>
@@ -62,12 +69,14 @@ export default function FilterDropdown({
   group,
   selected,
   isOpen,
+  singleSelect = false,
   onToggleOpen,
   onChange,
 }: {
   group: FilterGroup;
   selected: string[];
   isOpen: boolean;
+  singleSelect?: boolean;
   onToggleOpen: () => void;
   onChange: (values: string[]) => void;
 }) {
@@ -138,7 +147,14 @@ export default function FilterDropdown({
               key={option.value}
               label={option.label}
               selected={selected.includes(option.value)}
-              onToggle={() => onChange(toggleValue(selected, option.value))}
+              singleSelect={singleSelect}
+              onToggle={() =>
+                onChange(
+                  singleSelect
+                    ? [option.value]
+                    : toggleValue(selected, option.value)
+                )
+              }
             />
           ))}
         </div>

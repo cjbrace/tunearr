@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef } from "react";
+import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import SearchBar from "./components/SearchBar";
 import ReleaseGroupCard from "@/components/ReleaseGroupCard";
@@ -45,32 +45,35 @@ function AlbumSkeletonCard() {
   );
 }
 
-function SearchSkeletons() {
+function ArtistSkeletons() {
   return (
-    <div className="mt-6 space-y-8">
-      <div className={ARTIST_GRID_CLASS}>
-        {[...Array(8)].map((_, i) => (
-          <div key={i} className="flex flex-col items-center">
-            <Skeleton className="w-full aspect-square rounded-full" />
-            <Skeleton className="mt-2 h-3 w-3/4" />
-          </div>
-        ))}
-      </div>
-      <div className={ALBUM_GRID_CLASS}>
-        {[...Array(6)].map((_, i) => (
-          <AlbumSkeletonCard key={i} />
-        ))}
-      </div>
+    <div className={`${ARTIST_GRID_CLASS} mt-6`} aria-label="Loading artists">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="flex flex-col items-center">
+          <Skeleton className="w-full aspect-square rounded-full" />
+          <Skeleton className="mt-2 h-3 w-3/4" />
+        </div>
+      ))}
     </div>
   );
 }
 
+function AlbumSkeletons() {
+  return (
+    <div className={`${ALBUM_GRID_CLASS} mt-6`} aria-label="Loading albums">
+      {[...Array(4)].map((_, i) => (
+        <AlbumSkeletonCard key={i} />
+      ))}
+    </div>
+  );
+}
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     albums,
     artists,
-    loading,
+    albumLoading,
+    artistLoading,
     loadingMore,
     ranking,
     popularityUnavailable,
@@ -79,15 +82,19 @@ export default function SearchPage() {
     total,
     moreAvailable,
     loadMore,
-    error,
+    albumError,
+    artistError,
+    retryAlbums,
+    retryArtists,
     search,
   } = useSearch();
   const discovery = useDiscoveryFilters();
   const { getAlbumLibrary } = useLibraryAlbums();
   const { isArtistInLibrary } = useLibraryArtists();
   const inputRef = useRef<HTMLInputElement>(null);
-
   const query = searchParams.get("q") ?? "";
+  const [visibleState, setVisibleState] = useState({ query, count: 40 });
+  const visibleCount = visibleState.query === query ? visibleState.count : 40;
 
   useEffect(() => {
     search(query);
@@ -114,6 +121,7 @@ export default function SearchPage() {
     () => filterAndSortReleases(albums, discovery.filters, "search"),
     [albums, discovery.filters]
   );
+  const displayedAlbums = visibleAlbums.slice(0, visibleCount);
 
   const albumSection = (title: string, items: typeof albums) => (
     <section>
@@ -161,103 +169,144 @@ export default function SearchPage() {
           aria-live="polite"
           className="mb-3 text-sm text-gray-600 dark:text-gray-300"
         >
-          {error
-            ? "Search interrupted"
+          {albumError
+            ? "Album search unavailable"
             : complete
               ? `Complete · ${loaded} of ${total} releases`
               : moreAvailable
                 ? `${loaded} of ${total} releases loaded · Load more to complete`
                 : ranking
                   ? `Ranking · ${loaded} of ${total} releases loaded`
-                  : `Loading · ${loaded} of ${total} releases loaded`}
+                  : albumLoading
+                    ? "Loading album matches"
+                    : artistLoading
+                      ? "Loading artists"
+                      : `Loading · ${loaded} of ${total} releases loaded`}
           {popularityUnavailable && " · Listener counts unavailable"}
         </div>
       )}
 
-      {loading && <SearchSkeletons />}
+      {artistLoading && artists.length === 0 && <ArtistSkeletons />}
+      {artists.length > 0 && (
+        <section className="mt-6">
+          <h2 className={SECTION_HEADING_CLASS}>Artists</h2>
+          <div className={ARTIST_GRID_CLASS}>
+            {artists.map((artist) => (
+              <ArtistCard
+                key={artist.mbid}
+                name={artist.name}
+                mbid={artist.mbid}
+                imageUrl={artist.imageUrl}
+                inLibrary={isArtistInLibrary(artist.mbid, artist.name)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+      {artistError && (
+        <p className="mt-4 text-sm text-rose-500">
+          Artist lookup is unavailable.{" "}
+          <button
+            type="button"
+            onClick={() => void retryArtists()}
+            className="font-bold underline"
+          >
+            Retry artists
+          </button>
+        </p>
+      )}
 
-      {error && <p className="text-rose-500 mt-4">Error: {error}</p>}
-
-      {!loading && hasResults && (
-        <div className="mt-6 space-y-8">
-          {artists.length > 0 && (
-            <section>
-              <h2 className={SECTION_HEADING_CLASS}>Artists</h2>
-              <div className={ARTIST_GRID_CLASS}>
-                {artists.map((artist) => (
-                  <ArtistCard
-                    key={artist.mbid}
-                    name={artist.name}
-                    mbid={artist.mbid}
-                    imageUrl={artist.imageUrl}
-                    inLibrary={isArtistInLibrary(artist.mbid, artist.name)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
+      {albumLoading && albums.length === 0 && <AlbumSkeletons />}
+      {albumError && (
+        <p className="mt-4 text-sm text-rose-500">
+          Album lookup is unavailable.{" "}
+          <button
+            type="button"
+            onClick={() => void retryAlbums()}
+            className="font-bold underline"
+          >
+            Retry albums
+          </button>
+        </p>
+      )}
+      {visibleAlbums.length > 0 && (
+        <div className="mt-6 space-y-4">
           {visibleAlbums.some((rg) => rg.popularity) && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Releases are ranked by title match and ListenBrainz listeners.
             </p>
           )}
-          {visibleAlbums.length > 0 &&
-            albumSection("All releases", visibleAlbums)}
-          {albums.length > 0 && visibleAlbums.length === 0 && (
-            <p className="text-sm text-gray-500">
-              No releases match your filters.
-            </p>
-          )}
-          {moreAvailable && (
+          {albumSection("All releases", displayedAlbums)}
+          {visibleAlbums.length > visibleCount && (
             <button
               type="button"
-              onClick={() => void loadMore()}
-              disabled={loadingMore}
-              className="rounded-lg border-2 border-black bg-amber-300 px-4 py-2 font-semibold disabled:opacity-50"
+              onClick={() =>
+                setVisibleState({ query, count: visibleCount + 40 })
+              }
+              className="rounded-lg border-2 border-black bg-white px-4 py-2 text-sm font-semibold shadow-cartoon-sm hover:bg-amber-100 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
             >
-              {loadingMore
-                ? "Loading..."
-                : `Load more (${total - loaded} remaining)`}
+              Show more matches
             </button>
           )}
         </div>
       )}
-
-      {!loading && !error && !hasResults && (!query || complete) && (
-        <div className="mt-16 flex flex-col items-center text-gray-400 animate-fade-in">
-          <svg
-            className="w-16 h-16 mb-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
-            />
-          </svg>
-          {query ? (
-            <>
-              <p className="text-lg font-medium text-gray-500">
-                No results found
-              </p>
-              <p className="mt-1 text-center">Try a different search term.</p>
-            </>
-          ) : (
-            <>
-              <p className="text-lg font-medium text-gray-500">
-                Search for music
-              </p>
-              <p className="mt-1 text-center">
-                Find albums or artists by name to add to your library.
-              </p>
-            </>
-          )}
-        </div>
+      {moreAvailable && (
+        <button
+          type="button"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+          className="mt-4 rounded-lg border-2 border-black bg-amber-300 px-4 py-2 text-sm font-semibold shadow-cartoon-sm hover:bg-amber-200 disabled:opacity-50"
+        >
+          {loadingMore
+            ? "Loading..."
+            : `Load more (${total - loaded} remaining)`}
+        </button>
       )}
+      {albums.length > 0 && visibleAlbums.length === 0 && (
+        <p className="mt-4 text-sm text-gray-500">
+          No releases match your filters.
+        </p>
+      )}
+
+      {!artistLoading &&
+        !albumLoading &&
+        !artistError &&
+        !albumError &&
+        !hasResults &&
+        (!query || complete) && (
+          <div className="mt-16 flex flex-col items-center text-gray-400 animate-fade-in">
+            <svg
+              className="w-16 h-16 mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+              />
+            </svg>
+            {query ? (
+              <>
+                <p className="text-lg font-medium text-gray-500">
+                  No results found
+                </p>
+                <p className="mt-1 text-center">Try a different search term.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-medium text-gray-500">
+                  Search for music
+                </p>
+                <p className="mt-1 text-center">
+                  Find albums or artists by name to add to your library.
+                </p>
+              </>
+            )}
+          </div>
+        )}
     </div>
   );
 }
